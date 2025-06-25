@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/DeadWaveWave/waveforge/main/assets/WaveForge.png" alt="WaveForge Logo" width="200"/>
+  <img src="https://raw.githubusercontent.com/DeadWaveWave/waveforge/main/assets/WaveForge.png" alt="WaveForge Logo"/>
   <h1>WaveForge</h1>
   <p><strong>Your Personal AI Development Team</strong></p>
   <p>
