@@ -1,6 +1,6 @@
-# Cursor-Vibe-Coding: A Human-AI Collaborative Software Development Methodology
+# WaveForge: A Human-AI Collaborative Software Development Methodology
 
-Welcome to `Cursor-Vibe-Coding`! This is a highly structured software development workflow designed specifically for **collaboration between humans and AI developers**. It's more than just a collection of tools or files; it's a "Coding Vibe"—a way of working that aims to maximize the potential of human-AI collaboration through a **structured, transparent, auditable, and continuously improving** process.
+Welcome to `WaveForge`! This is a highly structured software development workflow designed specifically for **collaboration between humans and AI developers**. It's more than just a collection of tools or files; it's a "Coding Vibe"—a way of working that aims to maximize the potential of human-AI collaboration through a **structured, transparent, auditable, and continuously improving** process.
 
 The core idea of this project is to break down the complex software development process into a series of clearly defined roles, document outputs that follow standard templates, and AI behaviors driven by precise rules, thereby achieving efficient, high-quality development iterations.
 
@@ -14,7 +14,7 @@ The core idea of this project is to break down the complex software development 
 
 ## Project Components
 
-`Cursor-Vibe-Coding` is built on three main pillars, which together define the entire workflow. These configuration files are located in the `.cursor-en` directory by default.
+`WaveForge` is built on three main pillars, which together define the entire workflow. These configuration files are located in the `.cursor-en` directory by default.
 
 ### 1. Roles
 
@@ -48,7 +48,7 @@ The `rules/` directory contains a series of special `.mdc` files that are the un
 
 ## High-Level Workflow
 
-To more intuitively display the dependencies and human-AI collaboration points of each phase, the following diagram depicts the typical workflow of `Cursor-Vibe-Coding`:
+To more intuitively display the dependencies and human-AI collaboration points of each phase, the following diagram depicts the typical workflow of `WaveForge`:
 
 ```mermaid
 graph TD;
@@ -71,7 +71,7 @@ graph TD;
     E --> D1_next(...Start next Story...);
 ```
 
-A typical `Cursor-Vibe-Coding` workflow is described as follows:
+A typical `WaveForge` workflow is described as follows:
 
 1.  **Product Conception (PM-Concept)**: The user and the AI (`role-pm-core-concepts`) converse to create the `core-concepts.md` document, clarifying the product's core value.
 2.  **Version Planning (PM-PRD)**: Next, the user and the AI (`role-pm-version-prd`) collaborate to formulate a detailed `[version]-version-prd.md` based on the core concepts, breaking it down into a series of user stories.
@@ -91,4 +91,4 @@ A typical `Cursor-Vibe-Coding` workflow is described as follows:
 
 ---
 
-Hopefully, this `Cursor-Vibe-Coding` methodology will bring a smoother, more efficient collaborative experience for you and your AI partner!
+Hopefully, this `WaveForge` methodology will bring a smoother, more efficient collaborative experience for you and your AI partner!
