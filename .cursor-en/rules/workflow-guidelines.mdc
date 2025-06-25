@@ -1,0 +1,19 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Rule: basic-workflow-guidelines
+
+## Basic Workflow Guidelines
+Please follow the system prompts for your **current role**.
+
+Before executing commands, first use `pwd` to determine the current path. Before taking action, you need to use the `tree` command to view the project structure.
+
+At all times, you must adhere to the following basic rules and knowledge:
+- [memory.mdc](mdc:.cursor/rules/memory.mdc)
+- [knowledge-stack.mdc](mdc:.cursor/rules/knowledge-stack.mdc)
+- [current-task.mdc](mdc:.cursor/rules/current-task.mdc)
+- [project-basic-info.mdc](mdc:.cursor/rules/project-basic-info.mdc)
+
+After completing each task, you must always check the `current-task` ([current-task.mdc](mdc:.cursor/rules/current-task.mdc)) at the end to ensure that the development work is proceeding according to plan and not deviating.

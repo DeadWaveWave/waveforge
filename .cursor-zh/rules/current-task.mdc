@@ -1,0 +1,50 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Rule: current-task
+
+## current-task 文件说明
+
+该文件记载着 AI 当前正在执行的任务
+
+在开始执行任务时，一般情况由你自主思考、决策、执行。你只需要向用户汇报结果，汇报前要做好相关改动的测试。如果出现重要的决策或改动时必须通知用户。在这个过程中，你需要先做好整体的改动规划，再安插到单个任务步骤中逐步迭代实现。
+
+## current-task 更新规则：
+请根据以下具体情况和结构更新 `.cursor/rules/current-task.mdc` 文件 `<current-task>` 标签内的内容：
+
+1.  **任务初始化 (Task Initialization):**
+    *   当用户确认开始新任务时，在 `<current-task>` 内创建以下结构：
+        *   `### Task: [任务标题]`
+        *   `**Story PRD**: [Sotry PRD链接]`
+        *   `**Knowledge & References**: [docs 链接]`
+        *   `**Goal:** [任务目标描述]`
+        *   `**Target Directory:** [path]`
+        *   `**Overall Plan:**` (列出详细的步骤计划，用 `(To Do)` 标记初始状态)
+        *   `**Current Step:**` (标记第一个要执行的步骤)
+        *   `**Next Steps:**` (列出后续步骤)
+        *   `**Logs:**` (添加第一条日志，例如 `[时间戳] - Initiated [任务名称] task.`)
+2.  **任务进展更新 (Task Progress Update):**
+    *   每完成 `Overall Plan` 中的一个步骤：
+        *   在 `Overall Plan` 中将该步骤标记从 `(To Do)` 更新为 `(Done)`。
+        *   更新 `Current Step` 为下一个要执行的步骤。如果需要用户操作，请明确指出，例如 `(Pending User Action) Step X: ...`。
+        *   更新 `Next Steps` 列表，移除已完成的步骤。
+        *   若在开发过程中留有技术债，则需要在 `./cursor/backlogs` 创建或更新对应的技术债务偿还任务，以便纳入后续版本规划。
+        *   在 `Logs` 中添加一条日志，记录时间戳（从终端 `date \"+%Y-%m-%d-%H:%M\"` 获取）和完成的步骤。
+3.  **任务修改 (Task Modification):**
+    *   当用户修改任务目标或计划时：
+        *   相应更新 `Goal` 和 `Overall Plan` (可能需要增删改步骤)。
+        *   重新评估并更新 `Current Step` 和 `Next Steps`。
+        *   在 `Logs` 中添加一条日志，说明任务被修改。
+4.  **任务完成/切换 (Task Completion/Switching):**
+    *   当 `Overall Plan` 中的所有步骤都标记为 `(Done)` 时：
+        *   查看日志模板 `.cursor/templates/devlog-template.md` 并添加最终完成日志，记录本次工作的文件改动、技术调整情况等内容。
+        *   查看 `./cursor/backlogs`，在合适的地方更新技术债务情况。
+        *   更新 Version PRD 的 Story 完成状态（如果适用）。
+        *   清空 `<current-task>` 内的任务详情。
+    *   切换任务时，遵循任务完成的最后步骤，然后按任务初始化规则开始新任务。
+
+<current-task>
+
+</current-task>

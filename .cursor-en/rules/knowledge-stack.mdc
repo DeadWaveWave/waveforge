@@ -1,0 +1,20 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Rule: knowledge-stack
+
+knowledge-stack File Description: In this document, write the temporary knowledge required for the AI's work.
+
+How to use knowledge-stack:
+Write document links in this document to mount the necessary knowledge for the AI. The AI assistant can persist the currently required knowledge by managing the Markdown-formatted document links within the `<docs-stack>` tag in this file (.cursor/rules/knowledge-stack.mdc).
+If the document content is extensive and only a portion of the knowledge is needed temporarily, it can be copied into the `<temp-stack>` tag.
+
+<docs-stack>
+
+</docs-stack>
+
+<temp-stack>
+
+</temp-stack>

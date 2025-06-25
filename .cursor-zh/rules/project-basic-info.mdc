@@ -1,0 +1,18 @@
+---
+description: 这里记载着该项目的基本信息情况
+globs: 
+alwaysApply: true
+---
+# Rule: project-basic-info
+
+project-basic-info 文件说明：这里记载着该项目的基本信息情况。在每次新任务开始前，使用 tree 命令获取前后端的最新项目结构，并更新到 project-basic-info。
+
+<project-basic-info>
+
+## 项目路径
+- tool_base_path: /Users/deadwave/Development/codewave-project
+- git_repo_path: /Users/deadwave/Development/codewave-project/codewave
+- 前端: `/Users/deadwave/Development/codewave-project/codewave/frontend/mvp-app`
+- 后端: `/Users/deadwave/Development/codewave-project/codewave/backend`
+
+</project-basic-info>

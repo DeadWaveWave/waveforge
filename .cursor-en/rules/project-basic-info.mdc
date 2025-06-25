@@ -1,0 +1,18 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Rule: project-basic-info
+
+project-basic-info File Description: This file records the basic information of the project. Before each new task begins, use the tree command to get the latest project structure for both frontend and backend, and update it in project-basic-info.
+
+<project-basic-info>
+
+## Project Paths
+- tool_base_path: /Users/deadwave/Development/codewave-project
+- git_repo_path: /Users/deadwave/Development/codewave-project/codewave
+- Frontend: `/Users/deadwave/Development/codewave-project/codewave/frontend/mvp-app`
+- Backend: `/Users/deadwave/Development/codewave-project/codewave/backend`
+
+</project-basic-info>

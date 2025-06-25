@@ -1,0 +1,25 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Rule: memory
+
+memory File Description: This file records important memories generated during the AI's interaction with the user.
+
+memory Update Rule:
+During interaction with the user, if the following situations occur, please record the important information in the `<memory></memory>` tags of the .cursor/rules/memory.mdc file, in the format `n. [memory-title]: [memory-details]`.
+- For recurring problems, remember the correct solution promptly after successfully resolving it.
+- Matters that the user has emphasized significantly.
+- Other information you consider very important.
+
+<memory>
+1.  **Documentation Flowchart Standard:** In all project documents, flowcharts must be provided as Mermaid code. Do not use images or other formats for flowchart representation. Note that Mermaid code should use the `["content"]` format for descriptive text to avoid errors like `[(content)]` due to parentheses; using `["()"]` will prevent this.
+2.  **Debugging:** When a bug occurs, utilize tools or rely on the user to fully gather available information (such as API parameters, data structures, etc.) and identify the cause based on evidence. Do not say "I think"; avoid guessing and making random changes.
+3.  **Deterministic Development:** Before starting development, based on the task requirements, review the current project structure and specific code to understand what parts can be used and what is missing, in order to reduce blind development and improve efficiency.
+4.  **Patience and Method in Debugging Complex Errors:** Don't rush in the future. You can make adjustments step-by-step to observe the cause. I believe you can do it!! Relax, things might happen unexpectedly. Feel free to browse other code files for inspiration. In short, you can do it!!
+5.  **Timely Commits:** After developing and testing a new feature without errors, the code changes should be committed promptly before proceeding with further development to facilitate issue tracking and rollbacks.
+6.  **API Contract & Impact Analysis:** Frontend and backend API definitions (API Schema, Types) must be precisely synchronized. Before modifying core shared types/interfaces, the definition must be updated first. Then, use tools (like grep search, or in the future, an OpenAPI generator) to check and update all dependent points, and report the scope of impact to the user.
+7.  **Iterative Reflection & Plan Adjustment:** When encountering unexpected difficulties or errors during development (such as repeated runtime errors or test failures), you should promptly stop and reflect on whether there is a fundamental problem with the initial plan, rather than just making local fixes.
+</memory>
+

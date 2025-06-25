@@ -1,0 +1,50 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# Rule: current-task
+
+## current-task File Description
+
+This file documents the task the AI is currently executing.
+
+When starting a task, you are generally expected to think, decide, and execute autonomously. You only need to report the results to the user, and before reporting, you must test the relevant changes. You must notify the user of any important decisions or changes. During this process, you need to create an overall plan for the changes first, then break it down into individual task steps to be implemented iteratively.
+
+## current-task Update Rules:
+Please update the content within the `<current-task>` tag in the `.cursor/rules/current-task.mdc` file according to the following specific situations and structure:
+
+1.  **Task Initialization:**
+    *   When the user confirms the start of a new task, create the following structure within `<current-task>`:
+        *   `### Task: [Task Title]`
+        *   `**Story PRD**: [Link to Story PRD]`
+        *   `**Knowledge & References**: [Link to docs]`
+        *   `**Goal:** [Description of the task goal]`
+        *   `**Target Directory:** [path]`
+        *   `**Overall Plan:**` (List a detailed step-by-step plan, marking the initial state with `(To Do)`)
+        *   `**Current Step:**` (Mark the first step to be executed)
+        *   `**Next Steps:**` (List the subsequent steps)
+        *   `**Logs:**` (Add the first log entry, e.g., `[Timestamp] - Initiated [Task Name] task.`)
+2.  **Task Progress Update:**
+    *   Upon completing each step in the `Overall Plan`:
+        *   Update the step's marker in the `Overall Plan` from `(To Do)` to `(Done)`.
+        *   Update `Current Step` to the next step to be executed. If user action is required, state it clearly, e.g., `(Pending User Action) Step X: ...`.
+        *   Update the `Next Steps` list, removing the completed step.
+        *   If technical debt was incurred during development, create or update the corresponding technical debt repayment task in `./cursor/backlogs` to be included in future version planning.
+        *   Add a log entry in `Logs`, recording the timestamp (obtained from the terminal with `date \"+%Y-%m-%d-%H:%M\"`) and the completed step.
+3.  **Task Modification:**
+    *   When the user modifies the task goal or plan:
+        *   Update `Goal` and `Overall Plan` accordingly (may require adding, deleting, or modifying steps).
+        *   Re-evaluate and update `Current Step` and `Next Steps`.
+        *   Add a log entry in `Logs` stating that the task was modified.
+4.  **Task Completion/Switching:**
+    *   When all steps in the `Overall Plan` are marked as `(Done)`:
+        *   Consult the devlog template at `.cursor/templates/devlog-template.md` and add a final completion log, documenting file changes, technical adjustments, etc., from the work session.
+        *   Check `./cursor/backlogs` and update the technical debt status where appropriate.
+        *   Update the Story completion status in the Version PRD (if applicable).
+        *   Clear the task details within `<current-task>`.
+    *   When switching tasks, follow the final steps of task completion, then start the new task according to the task initialization rules.
+
+<current-task>
+
+</current-task>

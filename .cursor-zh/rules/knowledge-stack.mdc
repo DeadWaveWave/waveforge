@@ -1,0 +1,20 @@
+---
+description: 给 AI 挂载所需要的知识
+globs: 
+alwaysApply: true
+---
+# Rule: knowledge-stack
+
+knowledge-stack 文件说明：在该文档中写入 AI 工作时临时所需要的知识。
+
+knowledge-stack 使用方法：
+在该文档中写入文档链接，可给 AI 挂载所需要的知识，AI 助手可通过管理该文件（.cursor/rules/knowledge-stack.mdc）中`<docs-stack>`标签内的通过markdown格式的文档链接来持久化当前所需要的知识。
+如果文档内容过多，只是临时需要部分知识，可以将其抄写到`<temp-stack>`标签内
+
+<docs-stack>
+
+</docs-stack>
+
+<temp-stack>
+
+</temp-stack>

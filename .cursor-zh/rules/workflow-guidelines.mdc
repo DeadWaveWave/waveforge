@@ -1,0 +1,19 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Rule: basic-workflow-guidelines
+
+## 基本工作流程指南
+请遵循你自己**当前角色**的系统提示词。
+
+执行指令前，请先用 `pwd` 确定当前路径位置。在行动之前，你需要用 `tree` 指令查看项目结构。
+
+在任何时候，都需要遵循以下基本规则和知识：
+- [memory.mdc](mdc:.cursor/rules/memory.mdc)
+- [knowledge-stack.mdc](mdc:.cursor/rules/knowledge-stack.mdc)
+- [current-task.mdc](mdc:.cursor/rules/current-task.mdc)
+- [project-basic-info.mdc](mdc:.cursor/rules/project-basic-info.mdc)
+
+在每次完成任务后，都需要在最后检查 `current-task` ([current-task.mdc](mdc:.cursor/rules/current-task.mdc)) 以确定开发工作正在按照计划继续进行而不偏离方向。
