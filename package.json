@@ -1,0 +1,45 @@
+{
+  "name": "waveforge",
+  "version": "0.1.0",
+  "description": "WaveForge MCP 任务管理系统 - 双层级任务管理解决方案，专为AI代理协同工作设计",
+  "main": "dist/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts",
+    "build": "tsup",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write src",
+    "start": "node dist/server.js"
+  },
+  "keywords": [
+    "mcp",
+    "task-management",
+    "ai-agent",
+    "collaboration",
+    "development"
+  ],
+  "author": "DeadWaveWave",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "fs-extra": "^11.2.0",
+    "ulid": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/fs-extra": "^11.0.4",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
