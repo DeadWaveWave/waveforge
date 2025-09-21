@@ -5,7 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2024-06-25
+## [0.1.0] - 2025-09-21
+
+### Added
+
+- **Initial release of the WaveForge MCP Task Management System.**
+- Implemented core server logic, including MCP tools (`health`, `ping`), project root management, and a dual-layer task model.
+- Established a comprehensive test suite and created initial project documentation (`README`, `USAGE`, `CHANGELOG`).
+
+## [0.0.0] - 2025-06-25
 
 ### Added
 

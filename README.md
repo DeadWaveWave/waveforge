@@ -11,18 +11,18 @@
   <p><strong><a href="./README.zh-CN.md">中文</a></strong></p>
 </div>
 
-## Project Status
+## 🚩 Project Status
 
 WaveForge is in active design and development. The core design for its MCP-based task management and collaboration framework is complete, and implementation is underway. We welcome you to explore our roadmap and join the discussion!
 
-## Core Philosophy
+## 💡 Core Philosophy
 
 - **Vibe Coding Friendly**: Say goodbye to rigid processes. Embrace a "think as you go, change as you chat" development model. WaveForge breaks down tasks into macro-plans and micro-steps, allowing you and AI agents to think in a streamlined, modular way within the same context.
 - **Local First, Git Powered**: All task data, logs, and documents are stored as plain text files in the local `.wave` directory. This means you have full control over your data and can use Git for versioning, collaboration, and backups without relying on any external services.
 - **Traceable, Not Fabricated**: From requirement sources and Git commits to PR/Issue links and key decisions, WaveForge automatically builds a detailed "provenance chain." Generated Devlogs are based on facts, not AI hallucinations, ensuring every review is well-documented.
 - **Automated, Non-intrusive**: The system assists agent development through automated rules (like auto-completing plans and prompting for step generation) and non-intrusive hints, without ever interrupting the AI's development flow. It's a smart co-pilot, not a micromanaging boss.
 
-## Feature Highlights
+## ✨ Feature Highlights
 
 - **Intelligent Task System**
     - **Two-Level Task Model**: Easily manage complex tasks with a structure of "Overall Plans" and "Specific Steps." Get a high-level overview while focusing on the immediate task, unifying macro and micro perspectives.
@@ -34,6 +34,10 @@ WaveForge is in active design and development. The core design for its MCP-based
     - **Zero-Config Start & Self-Healing**: On its first run, it automatically and idempotently creates the necessary directory structure, templates, and configuration files. Ready to use out-of-the-box with no tedious setup.
     - **One-Click Devlog Generation**: Upon task completion, a single confirmation automatically generates two styles of development logs from a template: `timeline` (a faithful record of the execution trace) and `narrative` (story-like storytelling). The logs aggregate Git commits, file changes, test results, and key discussions, making documentation effortless.
     - **Comprehensive Traceability (Provenance)**: Automatically collects and organizes all task-related information, including Git commit ranges, PR/Issue links, requirement document paths, and meeting notes, to build a complete traceable information view.
+
+## 🚀 Getting Started
+
+For detailed instructions on installation, configuration, and usage, please see the [**Usage Guide (`USAGE.md`)**](./USAGE.md).
 
 ## Roadmap
 
@@ -74,6 +78,26 @@ We are actively working on implementing the following core features. Feel free t
 3.  **Code & Implement**: The agent focuses on the current plan, dynamically generating and executing "Steps." You can guide the agent at any time by adding `hints` manually or via other agents.
 4.  **Review & Document**: Once the task is complete, generate a Devlog with one click. Perfect for team sharing, technical reviews, or knowledge retention.
 
+## 🏗️ Architecture
+
+All of WaveForge's data is stored in the `.wave` folder in your project root. The server logic is organized as follows:
+
+```
+src/
+├── server.ts              # MCP server entry point
+├── core/                  # Core business logic
+│   ├── error-handler.ts   # Error handler
+│   ├── logger.ts          # Logger
+│   └── project-root-manager.ts # Project root manager
+├── tools/                 # MCP tool definitions
+│   ├── index.ts           # Tool implementations
+│   └── schemas.ts         # JSON Schema definitions
+├── types/                 # TypeScript type definitions
+│   └── index.ts           # Core types
+└── adapters/              # Adapter layer
+    └── index.ts           # Adapter interfaces
+```
+
 ## Architecture & File System
 
 All of WaveForge's data is stored in the `.wave` folder in your project root, with a clear and readable structure:
@@ -99,6 +123,21 @@ All of WaveForge's data is stored in the `.wave` folder in your project root, wi
 ## Toolkit (Future)
 
 One core, two entry points: MCP tools and a native Toolkit for direct agent calls. Stability and evolution will be ensured through a Tool Manifest, capability handshakes, and schema versioning.
+
+## 🤝 Development
+
+We aim for the highest code quality standards.
+
+- **TypeScript**: Written entirely in strict-mode TypeScript.
+- **Linting**: ESLint for code analysis.
+- **Formatting**: Prettier for consistent code style.
+- **Testing**: Vitest as the testing framework with a 100% coverage goal.
+
+## 🙏 Acknowledgements
+
+- **[Model Context Protocol](https://github.com/modelcontextprotocol)**: For the official MCP SDK that makes this possible.
+- **[TypeScript](https://www.typescriptlang.org/)**: For bringing type safety to JavaScript.
+- **[Vitest](https://vitest.dev/)**: For a blazingly fast testing experience.
 
 ## Star History
 
