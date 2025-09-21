@@ -1,4 +1,12 @@
 // 核心业务逻辑
-// 将在后续步骤中添加任务管理器等核心组件
+// 导出任务管理器和相关组件
 
-export {};
+export {
+  TaskManager,
+  createTaskManager,
+  TaskManagerError,
+  TaskManagerErrorType,
+} from './task-manager.js';
+export { ProjectRootManager } from './project-root-manager.js';
+export { logger } from './logger.js';
+export { ErrorHandler } from './error-handler.js';
