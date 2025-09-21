@@ -13,6 +13,8 @@ export enum ErrorType {
   FileSystemError = 'FILESYSTEM_ERROR',
   ConcurrencyError = 'CONCURRENCY_ERROR',
   NetworkError = 'NETWORK_ERROR',
+  SystemError = 'SYSTEM_ERROR',
+  NotFound = 'NOT_FOUND',
   UnknownError = 'UNKNOWN_ERROR',
 }
 
@@ -82,6 +84,26 @@ export class ConcurrencyError extends WaveForgeError {
 }
 
 /**
+ * 资源未找到错误
+ */
+export class NotFoundError extends WaveForgeError {
+  constructor(message: string, context?: Record<string, any>) {
+    super(message, ErrorType.NotFound, context);
+    this.name = 'NotFoundError';
+  }
+}
+
+/**
+ * 系统错误
+ */
+export class SystemError extends WaveForgeError {
+  constructor(message: string, context?: Record<string, any>) {
+    super(message, ErrorType.SystemError, context);
+    this.name = 'SystemError';
+  }
+}
+
+/**
  * 错误处理器类
  */
 export class ErrorHandler {
@@ -117,11 +139,27 @@ export class ErrorHandler {
     if (error instanceof WaveForgeError) {
       waveForgeError = error;
     } else if (error instanceof Error) {
-      waveForgeError = new WaveForgeError(
-        error.message,
-        ErrorType.UnknownError,
-        { originalError: error.name, ...context }
-      );
+      // 根据错误消息内容判断错误类型
+      let errorType = ErrorType.UnknownError;
+      if (
+        error.message.includes('磁盘空间不足') ||
+        error.message.includes('权限') ||
+        error.message.includes('文件') ||
+        error.message.includes('ENOENT') ||
+        error.message.includes('EINVAL')
+      ) {
+        errorType = ErrorType.SystemError;
+      } else if (
+        error.message.includes('不存在') ||
+        error.message.includes('没有')
+      ) {
+        errorType = ErrorType.NotFound;
+      }
+
+      waveForgeError = new WaveForgeError(error.message, errorType, {
+        originalError: error.name,
+        ...context,
+      });
     } else {
       waveForgeError = new WaveForgeError('未知错误', ErrorType.UnknownError, {
         originalError: String(error),

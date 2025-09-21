@@ -5,11 +5,11 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { TaskManager } from './task-manager.js';
-import * as fs from 'fs/promises';
+import fs from 'fs-extra';
 import * as path from 'path';
 
-// Mock fs 模块
-vi.mock('fs/promises');
+// Mock fs-extra 模块
+vi.mock('fs-extra');
 const mockFs = vi.mocked(fs);
 
 // Mock path 模块
@@ -23,10 +23,16 @@ describe('TaskManager', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    mockDocsPath = '/test/project/.wave';
+    mockDocsPath = '/tmp/test-wave';
     taskManager = new TaskManager(mockDocsPath);
 
     mockPath.join.mockImplementation((...paths) => paths.join('/'));
+
+    // Mock fs-extra operations to avoid real file system access
+    mockFs.ensureDir.mockResolvedValue();
+    mockFs.writeFile.mockResolvedValue();
+    (mockFs.readFile as any).mockResolvedValue('{}');
+    (mockFs.pathExists as any).mockResolvedValue(false);
   });
 
   describe('构造函数', () => {
@@ -121,7 +127,8 @@ describe('TaskManager', () => {
     });
 
     it('应该处理损坏的JSON文件', async () => {
-      mockFs.readFile.mockResolvedValue('invalid json');
+      (mockFs.pathExists as any).mockResolvedValue(true);
+      (mockFs.readFile as any).mockResolvedValue('invalid json');
 
       await expect(taskManager.getCurrentTask()).rejects.toThrow(
         '任务数据格式错误'
@@ -129,11 +136,11 @@ describe('TaskManager', () => {
     });
 
     it('应该处理空文件', async () => {
-      mockFs.readFile.mockResolvedValue('');
+      (mockFs.pathExists as any).mockResolvedValue(true);
+      (mockFs.readFile as any).mockResolvedValue('');
 
-      await expect(taskManager.getCurrentTask()).rejects.toThrow(
-        '任务数据为空'
-      );
+      const task = await taskManager.getCurrentTask();
+      expect(task).toBeNull();
     });
   });
 

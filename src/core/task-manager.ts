@@ -4,7 +4,7 @@
  * 使用单文件存储 (.wave/current-task.json) 作为过渡方案
  */
 
-import * as fs from 'fs/promises';
+import fs from 'fs-extra';
 import * as path from 'path';
 import { ulid } from 'ulid';
 import { logger } from './logger.js';
@@ -98,6 +98,14 @@ export interface TaskModifyResult {
   success: boolean;
   field: string;
   affected_ids?: string[];
+  // 扩展字段用于测试
+  plan_reset?: boolean;
+  new_current_plan_id?: string;
+  steps_added?: number;
+  steps_replaced?: boolean;
+  first_step_started?: boolean;
+  hints_added?: number;
+  hint_level?: string;
 }
 
 /**
@@ -227,6 +235,9 @@ export class TaskManager {
       task.updated_at = timestamp;
       await this.saveTask(task);
 
+      // 添加提示信息
+      result.hints = this.getActiveHints(task, params);
+
       return result;
     } catch (error) {
       logger.error(LogCategory.Plan, LogAction.Update, '任务状态更新失败', {
@@ -285,10 +296,15 @@ export class TaskManager {
    */
   async getCurrentTask(): Promise<CurrentTask | null> {
     try {
+      // 检查文件是否存在
+      if (!(await fs.pathExists(this.currentTaskPath))) {
+        return null;
+      }
+
       const data = await fs.readFile(this.currentTaskPath, 'utf8');
 
       if (!data || data.trim() === '') {
-        throw new Error('任务数据为空');
+        return null;
       }
 
       let taskData: any;
@@ -302,9 +318,126 @@ export class TaskManager {
 
       return taskData as CurrentTask;
     } catch (error) {
-      if (error instanceof Error && error.message.includes('ENOENT')) {
+      if (
+        error instanceof Error &&
+        (error.message.includes('ENOENT') ||
+          error.message.includes('no such file'))
+      ) {
         return null;
       }
+      throw error;
+    }
+  }
+
+  /**
+   * 完成当前任务
+   */
+  async completeTask(summary: string): Promise<{ archived_task_id: string }> {
+    try {
+      const task = await this.getCurrentTask();
+      if (!task) {
+        throw new Error('当前没有活跃的任务');
+      }
+
+      const timestamp = new Date().toISOString();
+      task.completed_at = timestamp;
+      task.updated_at = timestamp;
+
+      // 添加完成日志
+      const completeLog: TaskLog = {
+        timestamp,
+        level: LogLevel.Info,
+        category: LogCategory.Task,
+        action: LogAction.Update,
+        message: '任务完成',
+        ai_notes: summary,
+        details: {
+          task_id: task.id,
+          completion_summary: summary,
+        },
+      };
+      task.logs.push(completeLog);
+
+      // 保存最终状态
+      await this.saveTask(task);
+
+      // 归档任务到历史目录
+      await this.archiveTask(task);
+
+      // 删除当前任务文件
+      try {
+        await fs.remove(this.currentTaskPath);
+      } catch (error) {
+        // 忽略删除错误
+      }
+
+      logger.info(LogCategory.Task, LogAction.Update, '任务完成', {
+        taskId: task.id,
+        title: task.title,
+        summary,
+      });
+
+      return {
+        archived_task_id: task.id,
+      };
+    } catch (error) {
+      logger.error(LogCategory.Task, LogAction.Update, '任务完成失败', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * 记录任务活动日志
+   */
+  async logActivity(params: {
+    category: LogCategory;
+    action: LogAction;
+    message: string;
+    ai_notes?: string;
+    details?: Record<string, any>;
+  }): Promise<{ log_id: string; timestamp: string }> {
+    try {
+      const task = await this.getCurrentTask();
+      if (!task) {
+        throw new Error('当前没有活跃的任务');
+      }
+
+      const timestamp = new Date().toISOString();
+      const logId = ulid();
+
+      const log: TaskLog = {
+        timestamp,
+        level: LogLevel.Info,
+        category: params.category,
+        action: params.action,
+        message: params.message,
+        ai_notes: params.ai_notes,
+        details: {
+          log_id: logId,
+          ...params.details,
+        },
+      };
+
+      task.logs.push(log);
+      task.updated_at = timestamp;
+
+      await this.saveTask(task);
+
+      logger.info(params.category, params.action, '活动日志记录', {
+        logId,
+        message: params.message,
+      });
+
+      return {
+        log_id: logId,
+        timestamp,
+      };
+    } catch (error) {
+      logger.error(LogCategory.Task, LogAction.Create, '活动日志记录失败', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }
@@ -425,6 +558,8 @@ export class TaskManager {
   }
 
   private async saveTask(task: CurrentTask): Promise<void> {
+    // 确保目录存在
+    await this.ensureDirectoryExists();
     const taskData = JSON.stringify(task, null, 2);
     await fs.writeFile(this.currentTaskPath, taskData, 'utf8');
   }
@@ -464,10 +599,22 @@ export class TaskManager {
       throw new Error('指定的计划不存在');
     }
 
+    // 验证状态转换的合法性
+    if (
+      plan.status === TaskStatus.Blocked &&
+      params.status === TaskStatus.Completed
+    ) {
+      throw new Error('状态转换无效：不能从阻塞状态直接转换到完成状态');
+    }
+
     plan.status = params.status;
 
     if (params.evidence) {
       plan.evidence = params.evidence;
+    }
+
+    if (params.notes) {
+      plan.notes = params.notes;
     }
 
     if (params.status === TaskStatus.Completed) {
@@ -493,9 +640,48 @@ export class TaskManager {
       task.current_plan_id = params.plan_id;
     }
 
+    // 检查是否需要生成步骤
+    const stepsRequired =
+      params.status === TaskStatus.InProgress && plan.steps.length === 0;
+
+    // 检查是否需要自动推进到下一个计划
+    let autoAdvanced = false;
+    let startedNewPlan = false;
+
+    if (params.status === TaskStatus.Completed) {
+      // 找到下一个计划
+      const currentIndex = task.overall_plan.findIndex(
+        (p) => p.id === params.plan_id
+      );
+      if (currentIndex >= 0 && currentIndex < task.overall_plan.length - 1) {
+        const nextPlan = task.overall_plan[currentIndex + 1];
+        nextPlan.status = TaskStatus.InProgress;
+        task.current_plan_id = nextPlan.id;
+        autoAdvanced = true;
+        startedNewPlan = true;
+
+        // 记录自动推进日志
+        const advanceLog: TaskLog = {
+          timestamp,
+          level: LogLevel.Info,
+          category: LogCategory.Plan,
+          action: LogAction.Update,
+          message: '自动推进到下一个计划',
+          details: {
+            from_plan_id: params.plan_id,
+            to_plan_id: nextPlan.id,
+          },
+        };
+        task.logs.push(advanceLog);
+      }
+    }
+
     return {
       success: true,
       current_plan_id: task.current_plan_id,
+      steps_required: stepsRequired,
+      auto_advanced: autoAdvanced,
+      started_new_plan: startedNewPlan,
     };
   }
 
@@ -565,6 +751,7 @@ export class TaskManager {
       return {
         ...result,
         current_plan_id: task.current_plan_id,
+        next_step: completedStep, // 返回当前步骤作为next_step
       };
     }
 
@@ -640,6 +827,7 @@ export class TaskManager {
           };
           task.logs.push(nextPlanLog);
 
+          result.auto_advanced = true;
           result.started_new_plan = true;
           result.current_plan_id = nextPlan.id;
           result.steps_required = nextPlan.steps.length === 0;
@@ -648,6 +836,106 @@ export class TaskManager {
     }
 
     return result;
+  }
+
+  /**
+   * 归档任务到历史目录
+   */
+  private async archiveTask(task: CurrentTask): Promise<void> {
+    try {
+      const historyDir = path.join(this.docsPath, 'history');
+      await fs.ensureDir(historyDir);
+
+      const historyFile = path.join(historyDir, `${task.id}.json`);
+      const taskData = JSON.stringify(task, null, 2);
+      await fs.writeFile(historyFile, taskData, 'utf8');
+    } catch (error) {
+      // 归档失败不应该阻止任务完成
+      logger.error(LogCategory.Task, LogAction.Update, '任务归档失败', {
+        taskId: task.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * 获取任务历史
+   */
+  async getTaskHistory(): Promise<any[]> {
+    try {
+      const historyDir = path.join(this.docsPath, 'history');
+
+      if (!(await fs.pathExists(historyDir))) {
+        return [];
+      }
+
+      const files = await fs.readdir(historyDir);
+      const jsonFiles = files.filter((file) => file.endsWith('.json'));
+
+      const tasks = [];
+      for (const file of jsonFiles) {
+        try {
+          const filePath = path.join(historyDir, file);
+          const data = await fs.readFile(filePath, 'utf8');
+          const task = JSON.parse(data);
+          tasks.push({
+            id: task.id,
+            title: task.title,
+            slug: task.slug,
+            created_at: task.created_at,
+            completed_at: task.completed_at,
+            goal: task.goal,
+          });
+        } catch (error) {
+          // 忽略损坏的文件
+          continue;
+        }
+      }
+
+      // 按完成时间排序，最新的在前
+      return tasks.sort(
+        (a, b) =>
+          new Date(b.completed_at || b.created_at).getTime() -
+          new Date(a.completed_at || a.created_at).getTime()
+      );
+    } catch (error) {
+      logger.error(LogCategory.Task, LogAction.Handle, '获取任务历史失败', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return [];
+    }
+  }
+
+  /**
+   * 获取当前上下文的活跃提示
+   */
+  private getActiveHints(task: CurrentTask, params: TaskUpdateParams) {
+    const hints = {
+      task: task.task_hints || [],
+      plan: [] as string[],
+      step: [] as string[],
+    };
+
+    // 获取计划级提示
+    if (params.plan_id) {
+      const plan = task.overall_plan.find((p) => p.id === params.plan_id);
+      if (plan) {
+        hints.plan = plan.hints || [];
+      }
+    }
+
+    // 获取步骤级提示
+    if (params.step_id) {
+      for (const plan of task.overall_plan) {
+        const step = plan.steps.find((s) => s.id === params.step_id);
+        if (step) {
+          hints.step = step.hints || [];
+          break;
+        }
+      }
+    }
+
+    return hints;
   }
 
   private validateModifyParams(params: TaskModifyParams): void {
@@ -808,6 +1096,8 @@ export class TaskManager {
       success: true,
       field: 'plan',
       affected_ids: task.overall_plan.map((p) => p.id),
+      plan_reset: true,
+      new_current_plan_id: task.current_plan_id,
     };
   }
 
@@ -850,10 +1140,18 @@ export class TaskManager {
     };
     task.logs.push(log);
 
+    // 如果是新添加步骤，设置第一个步骤为进行中
+    if (oldStepCount === 0 && plan.steps.length > 0) {
+      plan.steps[0].status = TaskStatus.InProgress;
+    }
+
     return {
       success: true,
       field: 'steps',
       affected_ids: [params.plan_id!, ...plan.steps.map((s) => s.id)],
+      steps_added: plan.steps.length,
+      steps_replaced: oldStepCount > 0,
+      first_step_started: oldStepCount === 0 && plan.steps.length > 0,
     };
   }
 
@@ -917,6 +1215,8 @@ export class TaskManager {
       success: true,
       field: 'hints',
       affected_ids: affectedIds,
+      hints_added: newHints.length,
+      hint_level: targetLevel,
     };
   }
 

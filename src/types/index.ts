@@ -114,6 +114,8 @@ export interface TaskPlan {
   status: TaskStatus;
   /** 完成证据链接（可选） */
   evidence?: string;
+  /** 计划备注（可选） */
+  notes?: string;
   /** 计划级用户提示 */
   hints: string[];
   /** 该计划下的具体步骤 */
