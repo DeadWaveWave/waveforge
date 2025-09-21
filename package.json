@@ -7,11 +7,22 @@
   "scripts": {
     "dev": "tsx src/server.ts",
     "build": "tsup",
+    "build:watch": "tsup --watch",
+    "start": "node dist/server.js",
     "test": "vitest --run",
     "test:watch": "vitest",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui",
+    "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
-    "format": "prettier --write src",
-    "start": "node dist/server.js"
+    "lint:fix": "eslint src --ext .ts --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "rm -rf dist coverage .nyc_output",
+    "prepare": "husky",
+    "prepack": "pnpm run build",
+    "ci": "pnpm run type-check && pnpm run lint && pnpm run test",
+    "release": "pnpm run ci && pnpm run build"
   },
   "keywords": [
     "mcp",
@@ -28,11 +39,13 @@
     "ulid": "^2.3.0"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
     "@types/fs-extra": "^11.0.4",
+    "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.0.0",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.6",
     "prettier": "^3.0.0",
     "tsup": "^8.0.0",
     "tsx": "^4.0.0",

@@ -4,45 +4,45 @@
  * 任务状态枚举
  */
 export enum TaskStatus {
-  ToDo = "to_do",
-  InProgress = "in_progress", 
-  Completed = "completed",
-  Blocked = "blocked"
+  ToDo = 'to_do',
+  InProgress = 'in_progress',
+  Completed = 'completed',
+  Blocked = 'blocked',
 }
 
 /**
  * 日志级别枚举
  */
 export enum LogLevel {
-  Info = "INFO",
-  Warning = "WARNING", 
-  Error = "ERROR",
-  Teach = "TEACH"
+  Info = 'INFO',
+  Warning = 'WARNING',
+  Error = 'ERROR',
+  Teach = 'TEACH',
 }
 
 /**
  * 日志类别枚举
  */
 export enum LogCategory {
-  Plan = "PLAN",
-  Step = "STEP",
-  Task = "TASK",
-  Knowledge = "KNOWLEDGE",
-  Discussion = "DISCUSSION",
-  Exception = "EXCEPTION",
-  Test = "TEST",
-  Health = "HEALTH"
+  Plan = 'PLAN',
+  Step = 'STEP',
+  Task = 'TASK',
+  Knowledge = 'KNOWLEDGE',
+  Discussion = 'DISCUSSION',
+  Exception = 'EXCEPTION',
+  Test = 'TEST',
+  Health = 'HEALTH',
 }
 
 /**
  * 日志操作枚举
  */
 export enum LogAction {
-  Update = "UPDATE",
-  Create = "CREATE",
-  Modify = "MODIFY", 
-  Switch = "SWITCH",
-  Handle = "HANDLE"
+  Update = 'UPDATE',
+  Create = 'CREATE',
+  Modify = 'MODIFY',
+  Switch = 'SWITCH',
+  Handle = 'HANDLE',
 }
 
 /**

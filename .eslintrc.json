@@ -1,8 +1,6 @@
 {
   "parser": "@typescript-eslint/parser",
-  "extends": [
-    "eslint:recommended"
-  ],
+  "extends": ["eslint:recommended"],
   "plugins": ["@typescript-eslint"],
   "parserOptions": {
     "ecmaVersion": 2022,
@@ -10,8 +8,9 @@
   },
   "rules": {
     "@typescript-eslint/no-unused-vars": "error",
-    "@typescript-eslint/no-explicit-any": "warn",
-    "prefer-const": "error"
+    "@typescript-eslint/no-explicit-any": "off",
+    "prefer-const": "error",
+    "no-control-regex": "off"
   },
   "env": {
     "node": true,

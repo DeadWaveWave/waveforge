@@ -44,6 +44,17 @@ temp/
 # WaveForge specific
 .wave/current-task.md
 
+# Husky
+.husky/_
+
+# Coverage reports
+coverage/
+*.lcov
+
+# Test results
+test-results/
+junit.xml
+
 # TypeScript cache
 *.tsbuildinfo
 

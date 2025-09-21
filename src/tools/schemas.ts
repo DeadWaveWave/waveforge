@@ -8,7 +8,8 @@
  */
 export const HealthToolSchema = {
   name: 'health',
-  description: '检查服务器健康状态，返回服务器运行时间、内存使用情况、项目根目录等信息',
+  description:
+    '检查服务器健康状态，返回服务器运行时间、内存使用情况、项目根目录等信息',
   inputSchema: {
     type: 'object' as const,
     properties: {},
@@ -18,19 +19,19 @@ export const HealthToolSchema = {
     type: 'object' as const,
     properties: {
       success: { type: 'boolean' as const },
-      status: { 
+      status: {
         type: 'string' as const,
-        enum: ['healthy', 'unhealthy']
+        enum: ['healthy', 'unhealthy'],
       },
-      timestamp: { 
+      timestamp: {
         type: 'string' as const,
-        format: 'date-time'
+        format: 'date-time',
       },
       version: { type: 'string' as const },
-      uptime: { 
+      uptime: {
         type: 'number' as const,
         minimum: 0,
-        description: '服务器运行时间（秒）'
+        description: '服务器运行时间（秒）',
       },
       data: {
         type: 'object' as const,
@@ -38,48 +39,48 @@ export const HealthToolSchema = {
           server: { type: 'string' as const },
           capabilities: {
             type: 'array' as const,
-            items: { type: 'string' as const }
+            items: { type: 'string' as const },
           },
           projectRoot: {
             type: 'object' as const,
             properties: {
               root: { type: 'string' as const },
-              source: { 
+              source: {
                 type: 'string' as const,
-                enum: ['client_roots', 'cwd_fallback']
+                enum: ['client_roots', 'cwd_fallback'],
               },
-              available: { type: 'boolean' as const }
-            }
+              available: { type: 'boolean' as const },
+            },
           },
           environment: {
             type: 'object' as const,
             properties: {
               nodeVersion: { type: 'string' as const },
               platform: { type: 'string' as const },
-              arch: { type: 'string' as const }
-            }
+              arch: { type: 'string' as const },
+            },
           },
           memory: {
             type: 'object' as const,
             properties: {
-              used: { 
+              used: {
                 type: 'number' as const,
                 minimum: 0,
-                description: '已使用内存（MB）'
+                description: '已使用内存（MB）',
               },
-              total: { 
+              total: {
                 type: 'number' as const,
                 minimum: 0,
-                description: '总内存（MB）'
-              }
-            }
-          }
-        }
-      }
+                description: '总内存（MB）',
+              },
+            },
+          },
+        },
+      },
     },
     required: ['success', 'status', 'timestamp', 'version', 'uptime'],
-    additionalProperties: false
-  }
+    additionalProperties: false,
+  },
 };
 
 /**
@@ -87,7 +88,8 @@ export const HealthToolSchema = {
  */
 export const PingToolSchema = {
   name: 'ping',
-  description: '测试服务器连接，可选择性地回显消息。用于验证 MCP 连接是否正常工作',
+  description:
+    '测试服务器连接，可选择性地回显消息。用于验证 MCP 连接是否正常工作',
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -105,40 +107,48 @@ export const PingToolSchema = {
     type: 'object' as const,
     properties: {
       success: { type: 'boolean' as const },
-      message: { 
+      message: {
         type: 'string' as const,
-        enum: ['pong']
+        enum: ['pong'],
       },
-      echo: { 
+      echo: {
         type: ['string', 'null'] as const,
-        description: '回显的消息内容'
+        description: '回显的消息内容',
       },
-      timestamp: { 
+      timestamp: {
         type: 'string' as const,
-        format: 'date-time'
+        format: 'date-time',
       },
       server: { type: 'string' as const },
       version: { type: 'string' as const },
       data: {
         type: 'object' as const,
         properties: {
-          requestId: { 
+          requestId: {
             type: 'string' as const,
             pattern: '^ping_\\d+_[a-z0-9]+$',
-            description: '请求唯一标识符'
+            description: '请求唯一标识符',
           },
-          latency: { 
+          latency: {
             type: 'number' as const,
             minimum: 0,
-            description: '延迟时间（毫秒）'
-          }
+            description: '延迟时间（毫秒）',
+          },
         },
-        required: ['requestId', 'latency']
-      }
+        required: ['requestId', 'latency'],
+      },
     },
-    required: ['success', 'message', 'echo', 'timestamp', 'server', 'version', 'data'],
-    additionalProperties: false
-  }
+    required: [
+      'success',
+      'message',
+      'echo',
+      'timestamp',
+      'server',
+      'version',
+      'data',
+    ],
+    additionalProperties: false,
+  },
 };
 
 /**
@@ -153,7 +163,7 @@ export const ToolSchemas = {
  * 获取工具定义列表（用于 MCP ListTools 响应）
  */
 export function getToolDefinitions() {
-  return Object.values(ToolSchemas).map(schema => ({
+  return Object.values(ToolSchemas).map((schema) => ({
     name: schema.name,
     description: schema.description,
     inputSchema: schema.inputSchema,
@@ -163,12 +173,12 @@ export function getToolDefinitions() {
 /**
  * 验证工具输入参数
  */
-export function validateToolInput(toolName: string, input: any): boolean {
+export function validateToolInput(toolName: string): boolean {
   const schema = ToolSchemas[toolName as keyof typeof ToolSchemas];
   if (!schema) {
     throw new Error(`未知工具: ${toolName}`);
   }
-  
+
   // 这里可以集成 JSON Schema 验证库，如 ajv
   // 目前返回 true，实际验证在工具处理器中进行
   return true;

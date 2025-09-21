@@ -1,0 +1,19 @@
+# pnpm workspace configuration
+# 为未来的 monorepo 扩展做准备
+
+packages:
+  # 主包
+  - '.'
+
+  # 未来可能的子包
+  # - 'packages/*'
+  # - 'tools/*'
+  # - 'examples/*'
+
+# 排除不需要的目录
+exclude:
+  - '**/node_modules/**'
+  - '**/dist/**'
+  - '**/.git/**'
+  - '**/coverage/**'
+  - '**/.wave/**'

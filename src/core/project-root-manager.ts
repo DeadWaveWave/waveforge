@@ -21,12 +21,10 @@ export class ProjectRootManager {
    */
   setClientRoots(roots: string[]): void {
     this.clientRoots = roots;
-    logger.info(
-      LogCategory.Task,
-      LogAction.Update,
-      '客户端根目录已更新',
-      { roots, count: roots.length }
-    );
+    logger.info(LogCategory.Task, LogAction.Update, '客户端根目录已更新', {
+      roots,
+      count: roots.length,
+    });
   }
 
   /**
@@ -46,12 +44,10 @@ export class ProjectRootManager {
         const clientRoot = await this.validateClientRoot(this.clientRoots[0]);
         if (clientRoot) {
           this.projectRoot = clientRoot;
-          logger.info(
-            LogCategory.Task,
-            LogAction.Create,
-            '使用客户端根目录',
-            { root: clientRoot.root, source: clientRoot.source }
-          );
+          logger.info(LogCategory.Task, LogAction.Create, '使用客户端根目录', {
+            root: clientRoot.root,
+            source: clientRoot.source,
+          });
           return this.projectRoot;
         }
       }
@@ -59,30 +55,25 @@ export class ProjectRootManager {
       // 降级到当前工作目录
       const cwdRoot = await this.fallbackToCwd();
       this.projectRoot = cwdRoot;
-      
-      logger.warning(
-        LogCategory.Task,
-        LogAction.Create,
-        '降级到当前工作目录',
-        { root: cwdRoot.root, source: cwdRoot.source }
-      );
-      
+
+      logger.warning(LogCategory.Task, LogAction.Create, '降级到当前工作目录', {
+        root: cwdRoot.root,
+        source: cwdRoot.source,
+      });
+
       return this.projectRoot;
     } catch (error) {
-      logger.error(
-        LogCategory.Task,
-        LogAction.Create,
-        '项目根目录初始化失败',
-        { error: error instanceof Error ? error.message : String(error) }
-      );
-      
+      logger.error(LogCategory.Task, LogAction.Create, '项目根目录初始化失败', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+
       // 返回不可用的根目录信息
       this.projectRoot = {
         root: '',
         source: 'cwd_fallback',
         available: false,
       };
-      
+
       return this.projectRoot;
     }
   }
@@ -90,11 +81,13 @@ export class ProjectRootManager {
   /**
    * 验证客户端提供的根目录
    */
-  private async validateClientRoot(rootPath: string): Promise<ProjectRootInfo | null> {
+  private async validateClientRoot(
+    rootPath: string
+  ): Promise<ProjectRootInfo | null> {
     try {
       // 解析绝对路径
       const absolutePath = path.resolve(rootPath);
-      
+
       // 检查目录是否存在
       const stats = await fs.stat(absolutePath);
       if (!stats.isDirectory()) {
@@ -120,9 +113,9 @@ export class ProjectRootManager {
         LogCategory.Task,
         LogAction.Handle,
         '客户端根目录验证失败',
-        { 
-          path: rootPath, 
-          error: error instanceof Error ? error.message : String(error) 
+        {
+          path: rootPath,
+          error: error instanceof Error ? error.message : String(error),
         }
       );
       return null;
@@ -135,24 +128,23 @@ export class ProjectRootManager {
   private async fallbackToCwd(): Promise<ProjectRootInfo> {
     try {
       const cwd = process.cwd();
-      
+
       // 验证当前工作目录是否可访问
       await fs.access(cwd, fs.constants.R_OK);
-      
+
       return {
         root: cwd,
         source: 'cwd_fallback',
         available: true,
       };
     } catch (error) {
-      logger.error(
-        LogCategory.Task,
-        LogAction.Handle,
-        'CWD 降级失败',
-        { error: error instanceof Error ? error.message : String(error) }
+      logger.error(LogCategory.Task, LogAction.Handle, 'CWD 降级失败', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      throw new Error(
+        `无法访问当前工作目录: ${error instanceof Error ? error.message : String(error)}`
       );
-      
-      throw new Error(`无法访问当前工作目录: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -184,7 +176,7 @@ export class ProjectRootManager {
     if (!this.isProjectRootAvailable()) {
       return null;
     }
-    
+
     return path.resolve(this.projectRoot!.root, relativePath);
   }
 
@@ -195,10 +187,10 @@ export class ProjectRootManager {
     if (!this.isProjectRootAvailable()) {
       return false;
     }
-    
+
     const absolutePath = path.resolve(targetPath);
     const rootPath = this.projectRoot!.root;
-    
+
     return absolutePath.startsWith(rootPath);
   }
 
@@ -209,12 +201,12 @@ export class ProjectRootManager {
     if (!this.isProjectRootAvailable()) {
       return null;
     }
-    
+
     const rootPath = this.projectRoot!.root;
     if (!absolutePath.startsWith(rootPath)) {
       return null;
     }
-    
+
     return path.relative(rootPath, absolutePath);
   }
 
@@ -222,12 +214,8 @@ export class ProjectRootManager {
    * 刷新项目根目录状态
    */
   async refreshProjectRoot(): Promise<ProjectRootInfo> {
-    logger.info(
-      LogCategory.Task,
-      LogAction.Update,
-      '刷新项目根目录状态'
-    );
-    
+    logger.info(LogCategory.Task, LogAction.Update, '刷新项目根目录状态');
+
     return await this.initializeProjectRoot();
   }
 

@@ -46,10 +46,10 @@ export class HealthTool {
       };
 
       // 记录健康检查
-      logger.health('健康检查执行', { 
-        uptime: response.uptime, 
+      logger.health('健康检查执行', {
+        uptime: response.uptime,
         status: response.status,
-        memoryUsed: response.data.memory.used 
+        memoryUsed: response.data.memory.used,
       });
 
       return {
@@ -96,17 +96,21 @@ export class PingTool {
     try {
       // 参数验证
       if (args.message !== undefined) {
-        errorHandler.validateTypes({ message: args.message }, { message: 'string' });
-        
+        errorHandler.validateTypes(
+          { message: args.message },
+          { message: 'string' }
+        );
+
         // 验证消息长度
         if (args.message.length > 1000) {
           throw new ValidationError('消息长度不能超过 1000 个字符', {
             provided: args.message.length,
-            maximum: 1000
+            maximum: 1000,
           });
         }
-        
+
         // 验证消息内容（不允许包含控制字符）
+        // eslint-disable-next-line no-control-regex
         if (/[\x00-\x1F\x7F]/.test(args.message)) {
           throw new ValidationError('消息不能包含控制字符');
         }
@@ -126,12 +130,10 @@ export class PingTool {
       };
 
       // 记录 ping 请求
-      logger.info(
-        'TASK' as any,
-        'HANDLE' as any,
-        'Ping 请求处理完成',
-        { echo: response.echo, requestId: response.data.requestId }
-      );
+      logger.info('TASK' as any, 'HANDLE' as any, 'Ping 请求处理完成', {
+        echo: response.echo,
+        requestId: response.data.requestId,
+      });
 
       return {
         content: [
@@ -142,7 +144,10 @@ export class PingTool {
         ],
       };
     } catch (error) {
-      const errorResponse = errorHandler.handleError(error, { tool: 'ping', args });
+      const errorResponse = errorHandler.handleError(error, {
+        tool: 'ping',
+        args,
+      });
       return {
         content: [
           {

@@ -3,13 +3,13 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { 
-  ErrorHandler, 
-  WaveForgeError, 
-  ValidationError, 
-  FileSystemError, 
+import {
+  ErrorHandler,
+  WaveForgeError,
+  ValidationError,
+  FileSystemError,
   ConcurrencyError,
-  ErrorType 
+  ErrorType,
 } from './error-handler.js';
 
 describe('ErrorHandler', () => {
@@ -24,7 +24,7 @@ describe('ErrorHandler', () => {
     it('应该返回同一个实例', () => {
       const instance1 = ErrorHandler.getInstance();
       const instance2 = ErrorHandler.getInstance();
-      
+
       expect(instance1).toBe(instance2);
     });
   });
@@ -38,7 +38,9 @@ describe('ErrorHandler', () => {
       expect(result.error).toBe('测试验证错误');
       expect(result.type).toBe(ErrorType.ValidationError);
       expect(result.context).toEqual({ field: 'test' });
-      expect(result.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+      expect(result.timestamp).toMatch(
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+      );
     });
 
     it('应该处理普通 Error', () => {
@@ -48,7 +50,10 @@ describe('ErrorHandler', () => {
       expect(result.success).toBe(false);
       expect(result.error).toBe('普通错误');
       expect(result.type).toBe(ErrorType.UnknownError);
-      expect(result.context).toEqual({ originalError: 'Error', source: 'test' });
+      expect(result.context).toEqual({
+        originalError: 'Error',
+        source: 'test',
+      });
     });
 
     it('应该处理非 Error 对象', () => {
@@ -94,10 +99,12 @@ describe('ErrorHandler', () => {
         errorHandler.validateRequired(params, requiredFields);
       } catch (error) {
         expect(error).toBeInstanceOf(ValidationError);
-        expect((error as ValidationError).message).toContain('缺少必需参数: age, email');
+        expect((error as ValidationError).message).toContain(
+          '缺少必需参数: age, email'
+        );
         expect((error as ValidationError).context).toEqual({
           missing: ['age', 'email'],
-          provided: ['name']
+          provided: ['name'],
         });
       }
     });
@@ -159,7 +166,7 @@ describe('ErrorHandler', () => {
         error: '异步验证错误',
         type: ErrorType.ValidationError,
         timestamp: expect.any(String),
-        context: { field: 'test' }
+        context: { field: 'test' },
       });
     });
   });
@@ -168,32 +175,40 @@ describe('ErrorHandler', () => {
 describe('WaveForgeError', () => {
   it('应该创建基础错误', () => {
     const error = new WaveForgeError('测试错误');
-    
+
     expect(error.name).toBe('WaveForgeError');
     expect(error.message).toBe('测试错误');
     expect(error.type).toBe(ErrorType.UnknownError);
-    expect(error.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
+    expect(error.timestamp).toMatch(
+      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
+    );
   });
 
   it('应该创建带上下文的错误', () => {
     const context = { field: 'test', value: 123 };
-    const error = new WaveForgeError('测试错误', ErrorType.ValidationError, context);
-    
+    const error = new WaveForgeError(
+      '测试错误',
+      ErrorType.ValidationError,
+      context
+    );
+
     expect(error.type).toBe(ErrorType.ValidationError);
     expect(error.context).toEqual(context);
   });
 
   it('应该正确序列化为 JSON', () => {
-    const error = new WaveForgeError('测试错误', ErrorType.ValidationError, { test: true });
+    const error = new WaveForgeError('测试错误', ErrorType.ValidationError, {
+      test: true,
+    });
     const json = error.toJSON();
-    
+
     expect(json).toEqual({
       name: 'WaveForgeError',
       message: '测试错误',
       type: ErrorType.ValidationError,
       timestamp: error.timestamp,
       context: { test: true },
-      stack: error.stack
+      stack: error.stack,
     });
   });
 });
@@ -201,7 +216,7 @@ describe('WaveForgeError', () => {
 describe('ValidationError', () => {
   it('应该创建验证错误', () => {
     const error = new ValidationError('验证失败', { field: 'email' });
-    
+
     expect(error.name).toBe('ValidationError');
     expect(error.message).toBe('验证失败');
     expect(error.type).toBe(ErrorType.ValidationError);
@@ -212,7 +227,7 @@ describe('ValidationError', () => {
 describe('FileSystemError', () => {
   it('应该创建文件系统错误', () => {
     const error = new FileSystemError('文件不存在', { path: '/test/file.txt' });
-    
+
     expect(error.name).toBe('FileSystemError');
     expect(error.message).toBe('文件不存在');
     expect(error.type).toBe(ErrorType.FileSystemError);
@@ -223,7 +238,7 @@ describe('FileSystemError', () => {
 describe('ConcurrencyError', () => {
   it('应该创建并发错误', () => {
     const error = new ConcurrencyError('锁获取失败', { lockId: 'task-123' });
-    
+
     expect(error.name).toBe('ConcurrencyError');
     expect(error.message).toBe('锁获取失败');
     expect(error.type).toBe(ErrorType.ConcurrencyError);

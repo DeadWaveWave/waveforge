@@ -10,5 +10,5 @@ export default defineConfig({
   outDir: 'dist',
   splitting: false,
   bundle: false, // 不打包，保持模块结构
-  external: ['@modelcontextprotocol/sdk']
+  external: ['@modelcontextprotocol/sdk'],
 });

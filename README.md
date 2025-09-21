@@ -25,15 +25,15 @@ WaveForge is in active design and development. The core design for its MCP-based
 ## ✨ Feature Highlights
 
 - **Intelligent Task System**
-    - **Two-Level Task Model**: Easily manage complex tasks with a structure of "Overall Plans" and "Specific Steps." Get a high-level overview while focusing on the immediate task, unifying macro and micro perspectives.
-    - **Automation-Driven Workflow**: When the last step of a plan is completed, the system automatically completes the plan and prompts the AI to generate steps for the next one. This "relay race" style of automation makes task progression seamless.
+  - **Two-Level Task Model**: Easily manage complex tasks with a structure of "Overall Plans" and "Specific Steps." Get a high-level overview while focusing on the immediate task, unifying macro and micro perspectives.
+  - **Automation-Driven Workflow**: When the last step of a plan is completed, the system automatically completes the plan and prompts the AI to generate steps for the next one. This "relay race" style of automation makes task progression seamless.
 - **Seamless Multi-Agent & Cross-Tool Collaboration**
-    - **Unique Project Identifier**: A revolutionary project-binding mechanism eliminates dependency on the current working directory (CWD) or editor workspace. No matter which tool (Cursor, VSCode, Kiro) or terminal you're in, all agents are guaranteed to collaborate within the same project context.
-    - **Real-Time Sync Guarantee**: Ensures data consistency and avoids state conflicts during parallel operations by multiple agents through file locking and state versioning.
+  - **Unique Project Identifier**: A revolutionary project-binding mechanism eliminates dependency on the current working directory (CWD) or editor workspace. No matter which tool (Cursor, VSCode, Kiro) or terminal you're in, all agents are guaranteed to collaborate within the same project context.
+  - **Real-Time Sync Guarantee**: Ensures data consistency and avoids state conflicts during parallel operations by multiple agents through file locking and state versioning.
 - **Developer Experience First**
-    - **Zero-Config Start & Self-Healing**: On its first run, it automatically and idempotently creates the necessary directory structure, templates, and configuration files. Ready to use out-of-the-box with no tedious setup.
-    - **One-Click Devlog Generation**: Upon task completion, a single confirmation automatically generates two styles of development logs from a template: `timeline` (a faithful record of the execution trace) and `narrative` (story-like storytelling). The logs aggregate Git commits, file changes, test results, and key discussions, making documentation effortless.
-    - **Comprehensive Traceability (Provenance)**: Automatically collects and organizes all task-related information, including Git commit ranges, PR/Issue links, requirement document paths, and meeting notes, to build a complete traceable information view.
+  - **Zero-Config Start & Self-Healing**: On its first run, it automatically and idempotently creates the necessary directory structure, templates, and configuration files. Ready to use out-of-the-box with no tedious setup.
+  - **One-Click Devlog Generation**: Upon task completion, a single confirmation automatically generates two styles of development logs from a template: `timeline` (a faithful record of the execution trace) and `narrative` (story-like storytelling). The logs aggregate Git commits, file changes, test results, and key discussions, making documentation effortless.
+  - **Comprehensive Traceability (Provenance)**: Automatically collects and organizes all task-related information, including Git commit ranges, PR/Issue links, requirement document paths, and meeting notes, to build a complete traceable information view.
 
 ## 🚀 Getting Started
 
@@ -44,32 +44,35 @@ For detailed instructions on installation, configuration, and usage, please see 
 We are actively working on implementing the following core features. Feel free to join the discussion or contribute!
 
 ### Core Framework
+
 - [ ] **Project Binding & Environment Self-Healing**
-    - [ ] `project_bind`: Implement unique binding between a project and the MCP service, eliminating CWD dependency.
-    - [ ] `project_info`: Get information about the currently bound project.
-    - [ ] **Initialization & Self-Healing**: Automatically create the `.wave` directory structure, templates, and config files on the first run.
+  - [ ] `project_bind`: Implement unique binding between a project and the MCP service, eliminating CWD dependency.
+  - [ ] `project_info`: Get information about the currently bound project.
+  - [ ] **Initialization & Self-Healing**: Automatically create the `.wave` directory structure, templates, and config files on the first run.
 
 ### Task Management (MCP Tools)
+
 - [ ] **Two-Level Task Model**
-    - [ ] `current_task_init`: Initialize a new task, defining its `goal` and `overall_plan`.
-    - [ ] `current_task_modify`: Dynamically adjust tasks, including the `plan`, `steps`, `goal`, or adding `hints` for the AI.
-    - [ ] `current_task_update`: Update the status of a `plan` or `step`.
+  - [ ] `current_task_init`: Initialize a new task, defining its `goal` and `overall_plan`.
+  - [ ] `current_task_modify`: Dynamically adjust tasks, including the `plan`, `steps`, `goal`, or adding `hints` for the AI.
+  - [ ] `current_task_update`: Update the status of a `plan` or `step`.
 - [ ] **Task Lifecycle**
-    - [ ] `current_task_read`: Read the full context of the current task to sync between clients.
-    - [ ] `current_task_complete`: Mark a task as complete and trigger Devlog generation.
-    - [ ] `task_list`: View a list of historical tasks.
-    - [ ] `task_switch`: Switch between different tasks.
+  - [ ] `current_task_read`: Read the full context of the current task to sync between clients.
+  - [ ] `current_task_complete`: Mark a task as complete and trigger Devlog generation.
+  - [ ] `task_list`: View a list of historical tasks.
+  - [ ] `task_switch`: Switch between different tasks.
 - [ ] **Process Logging & Traceability**
-    - [ ] `current_task_log`: Log key discussions, decisions, or exceptions during development.
-    - [ ] **Provenance**: Automatically associate Git commits, PR/Issue links, and other artifacts.
+  - [ ] `current_task_log`: Log key discussions, decisions, or exceptions during development.
+  - [ ] **Provenance**: Automatically associate Git commits, PR/Issue links, and other artifacts.
 
 ### Automation & Doc Generation
+
 - [ ] **Automated Workflow**
-    - [ ] Automatically mark a plan as completed when all its steps are done.
-    - [ ] Prompt the AI to generate steps when starting a new plan.
+  - [ ] Automatically mark a plan as completed when all its steps are done.
+  - [ ] Prompt the AI to generate steps when starting a new plan.
 - [ ] **Devlog Auto-Generation**
-    - [ ] `devlog_prepare_context`: Prepare the context needed for Devlog generation.
-    - [ ] `generate_devlog`: Populate `timeline` and `narrative` devlogs from templates using task snapshots, logs, and Git history.
+  - [ ] `devlog_prepare_context`: Prepare the context needed for Devlog generation.
+  - [ ] `generate_devlog`: Populate `timeline` and `narrative` devlogs from templates using task snapshots, logs, and Git history.
 
 ## Workflow: From Idea to Implementation
 

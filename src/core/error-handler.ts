@@ -102,7 +102,10 @@ export class ErrorHandler {
   /**
    * 处理错误并返回标准化响应
    */
-  handleError(error: unknown, context?: Record<string, any>): {
+  handleError(
+    error: unknown,
+    context?: Record<string, any>
+  ): {
     success: false;
     error: string;
     type: string;
@@ -120,11 +123,10 @@ export class ErrorHandler {
         { originalError: error.name, ...context }
       );
     } else {
-      waveForgeError = new WaveForgeError(
-        '未知错误',
-        ErrorType.UnknownError,
-        { originalError: String(error), ...context }
-      );
+      waveForgeError = new WaveForgeError('未知错误', ErrorType.UnknownError, {
+        originalError: String(error),
+        ...context,
+      });
     }
 
     // 记录错误日志
@@ -183,15 +185,15 @@ export class ErrorHandler {
     params: Record<string, any>,
     requiredFields: string[]
   ): void {
-    const missing = requiredFields.filter(field => 
-      params[field] === undefined || params[field] === null
+    const missing = requiredFields.filter(
+      (field) => params[field] === undefined || params[field] === null
     );
 
     if (missing.length > 0) {
-      throw new ValidationError(
-        `缺少必需参数: ${missing.join(', ')}`,
-        { missing, provided: Object.keys(params) }
-      );
+      throw new ValidationError(`缺少必需参数: ${missing.join(', ')}`, {
+        missing,
+        provided: Object.keys(params),
+      });
     }
   }
 
@@ -214,10 +216,10 @@ export class ErrorHandler {
     }
 
     if (errors.length > 0) {
-      throw new ValidationError(
-        `参数类型错误: ${errors.join('; ')}`,
-        { errors, params }
-      );
+      throw new ValidationError(`参数类型错误: ${errors.join('; ')}`, {
+        errors,
+        params,
+      });
     }
   }
 }

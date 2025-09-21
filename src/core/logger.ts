@@ -63,7 +63,12 @@ export class Logger {
    * 检查是否应该记录指定级别的日志
    */
   private shouldLog(level: LogLevel): boolean {
-    const levels = [LogLevel.Info, LogLevel.Warning, LogLevel.Error, LogLevel.Teach];
+    const levels = [
+      LogLevel.Info,
+      LogLevel.Warning,
+      LogLevel.Error,
+      LogLevel.Teach,
+    ];
     const currentIndex = levels.indexOf(this.logLevel);
     const targetIndex = levels.indexOf(level);
     return targetIndex >= currentIndex;
@@ -187,12 +192,10 @@ export class Logger {
    * 记录工具调用日志
    */
   toolCall(toolName: string, args?: Record<string, any>): void {
-    this.info(
-      LogCategory.Task,
-      LogAction.Handle,
-      `工具调用: ${toolName}`,
-      { tool: toolName, arguments: args }
-    );
+    this.info(LogCategory.Task, LogAction.Handle, `工具调用: ${toolName}`, {
+      tool: toolName,
+      arguments: args,
+    });
   }
 
   /**

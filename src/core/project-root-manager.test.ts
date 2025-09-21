@@ -21,17 +21,17 @@ describe('ProjectRootManager', () => {
     it('应该设置和获取客户端根目录', () => {
       const roots = ['/test/project1', '/test/project2'];
       manager.setClientRoots(roots);
-      
+
       expect(manager.getClientRoots()).toEqual(roots);
     });
 
     it('应该返回客户端根目录的副本', () => {
       const roots = ['/test/project'];
       manager.setClientRoots(roots);
-      
+
       const retrieved = manager.getClientRoots();
       retrieved.push('/modified');
-      
+
       expect(manager.getClientRoots()).toEqual(roots);
     });
   });
@@ -43,7 +43,7 @@ describe('ProjectRootManager', () => {
 
       // Mock fs.stat 和 fs.access 成功
       vi.mocked(fs.stat).mockResolvedValue({
-        isDirectory: () => true
+        isDirectory: () => true,
       } as any);
       vi.mocked(fs.access).mockResolvedValue(undefined);
 
@@ -59,8 +59,10 @@ describe('ProjectRootManager', () => {
       manager.setClientRoots([invalidRoot]);
 
       // Mock 客户端根目录验证失败
-      vi.mocked(fs.stat).mockRejectedValueOnce(new Error('Directory not found'));
-      
+      vi.mocked(fs.stat).mockRejectedValueOnce(
+        new Error('Directory not found')
+      );
+
       // Mock CWD 成功
       const originalCwd = process.cwd;
       process.cwd = vi.fn().mockReturnValue('/current/working/dir');
@@ -112,9 +114,9 @@ describe('ProjectRootManager', () => {
       const originalCwd = process.cwd;
       process.cwd = vi.fn().mockReturnValue('/test/project');
       vi.mocked(fs.access).mockResolvedValue(undefined);
-      
+
       await manager.initializeProjectRoot();
-      
+
       process.cwd = originalCwd;
     });
 
@@ -142,17 +144,17 @@ describe('ProjectRootManager', () => {
   describe('状态查询', () => {
     it('应该返回正确的项目根目录统计信息', async () => {
       manager.setClientRoots(['/test/project1', '/test/project2']);
-      
+
       // Mock 客户端根目录验证成功
       vi.mocked(fs.stat).mockResolvedValue({
-        isDirectory: () => true
+        isDirectory: () => true,
       } as any);
       vi.mocked(fs.access).mockResolvedValue(undefined);
-      
+
       await manager.initializeProjectRoot();
-      
+
       const stats = manager.getProjectRootStats();
-      
+
       expect(stats.available).toBe(true);
       expect(stats.source).toBe('client_roots'); // 应该使用客户端根目录
       expect(stats.path).toBe('/test/project1'); // 使用第一个客户端根目录
@@ -163,14 +165,14 @@ describe('ProjectRootManager', () => {
       const originalCwd = process.cwd;
       process.cwd = vi.fn().mockReturnValue('/inaccessible');
       vi.mocked(fs.access).mockRejectedValue(new Error('Access denied'));
-      
+
       await manager.initializeProjectRoot();
-      
+
       const stats = manager.getProjectRootStats();
-      
+
       expect(stats.available).toBe(false);
       expect(stats.path).toBeNull();
-      
+
       process.cwd = originalCwd;
     });
   });
@@ -180,16 +182,16 @@ describe('ProjectRootManager', () => {
       const originalCwd = process.cwd;
       process.cwd = vi.fn().mockReturnValue('/initial/dir');
       vi.mocked(fs.access).mockResolvedValue(undefined);
-      
+
       await manager.initializeProjectRoot();
       expect(manager.getProjectRootPath()).toBe('/initial/dir');
-      
+
       // 更改 CWD 并刷新
       process.cwd = vi.fn().mockReturnValue('/new/dir');
       await manager.refreshProjectRoot();
-      
+
       expect(manager.getProjectRootPath()).toBe('/new/dir');
-      
+
       process.cwd = originalCwd;
     });
   });

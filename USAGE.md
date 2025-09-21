@@ -50,6 +50,7 @@ pnpm start
 Checks the server's health status, returning uptime, memory usage, etc.
 
 **Schema:**
+
 ```json
 {
   "name": "health",
@@ -67,6 +68,7 @@ Checks the server's health status, returning uptime, memory usage, etc.
 Tests the server connection and can optionally echo a message.
 
 **Schema:**
+
 ```json
 {
   "name": "ping",
@@ -95,7 +97,6 @@ Tests the server connection and can optionally echo a message.
 | `WF_DOCS_ROOT`       | Documentation root directory                    | `.wave`                              |
 | `WF_DEVLOG_TEMPLATE` | Path to the Devlog template                     | `.wave/templates/devlog-template.md` |
 | `WF_DEBUG`           | Debug mode (`true` or `false`)                  | `false`                              |
-
 
 ### MCP Client Configuration
 
