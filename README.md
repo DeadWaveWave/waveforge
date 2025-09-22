@@ -13,7 +13,7 @@
 
 ## 🚩 Project Status
 
-WaveForge is in active design and development. The core design for its MCP-based task management and collaboration framework is complete, and implementation is underway. We welcome you to explore our roadmap and join the discussion!
+WaveForge MCP task management system is now largely complete! Core project management and task management features have been fully implemented and tested. You can start using the complete task management workflow right now. We're continuously optimizing performance and user experience - welcome to try it out and provide feedback!
 
 ## 💡 Core Philosophy
 
@@ -39,47 +39,57 @@ WaveForge is in active design and development. The core design for its MCP-based
 
 For detailed instructions on installation, configuration, and usage, please see the [**Usage Guide (`USAGE.md`)**](./USAGE.md).
 
+**Quick Start**: Want to jump right in? Check out the [**Quick Start Guide (`docs/quick-start.md`)**](./docs/quick-start.md) for a complete workflow example.
+
+If you encounter any issues, check the [**Troubleshooting Guide (`docs/troubleshooting.md`)**](./docs/troubleshooting.md) for known problems and solutions.
+
 ## Roadmap
 
 We are actively working on implementing the following core features. Feel free to join the discussion or contribute!
 
 ### Core Framework
 
-- [ ] **Project Binding & Environment Self-Healing**
-  - [ ] `project_bind`: Implement unique binding between a project and the MCP service, eliminating CWD dependency.
-  - [ ] `project_info`: Get information about the currently bound project.
+- [x] **Project Binding & Environment Self-Healing**
+  - [x] `connect_project`: Implement unique binding between a project and the MCP service, eliminating CWD dependency.
+  - [x] `project_info`: Get information about the currently bound project.
   - [ ] **Initialization & Self-Healing**: Automatically create the `.wave` directory structure, templates, and config files on the first run.
 
 ### Task Management (MCP Tools)
 
-- [ ] **Two-Level Task Model**
-  - [ ] `current_task_init`: Initialize a new task, defining its `goal` and `overall_plan`.
-  - [ ] `current_task_modify`: Dynamically adjust tasks, including the `plan`, `steps`, `goal`, or adding `hints` for the AI.
-  - [ ] `current_task_update`: Update the status of a `plan` or `step`.
-- [ ] **Task Lifecycle**
-  - [ ] `current_task_read`: Read the full context of the current task to sync between clients.
-  - [ ] `current_task_complete`: Mark a task as complete and trigger Devlog generation.
+- [x] **Two-Level Task Model**
+  - [x] `current_task_init`: Initialize a new task, defining its `goal` and `overall_plan`.
+  - [x] `current_task_modify`: Dynamically adjust tasks, including the `plan`, `steps`, `goal`, or adding `hints` for the AI.
+  - [x] `current_task_update`: Update the status of a `plan` or `step`.
+- [x] **Task Lifecycle**
+  - [x] `current_task_read`: Read the full context of the current task to sync between clients.
+  - [x] `current_task_complete`: Mark a task as complete and trigger Devlog generation.
   - [ ] `task_list`: View a list of historical tasks.
   - [ ] `task_switch`: Switch between different tasks.
-- [ ] **Process Logging & Traceability**
-  - [ ] `current_task_log`: Log key discussions, decisions, or exceptions during development.
+- [x] **Process Logging & Traceability**
+  - [x] `current_task_log`: Log key discussions, decisions, or exceptions during development.
   - [ ] **Provenance**: Automatically associate Git commits, PR/Issue links, and other artifacts.
 
 ### Automation & Doc Generation
 
-- [ ] **Automated Workflow**
-  - [ ] Automatically mark a plan as completed when all its steps are done.
-  - [ ] Prompt the AI to generate steps when starting a new plan.
-- [ ] **Devlog Auto-Generation**
+- [x] **Automated Workflow**
+  - [x] Automatically mark a plan as completed when all its steps are done.
+  - [x] Prompt the AI to generate steps when starting a new plan.
+- [x] **Devlog Auto-Generation**
+  - [x] Provide development log generation suggestions and templates upon task completion.
   - [ ] `devlog_prepare_context`: Prepare the context needed for Devlog generation.
   - [ ] `generate_devlog`: Populate `timeline` and `narrative` devlogs from templates using task snapshots, logs, and Git history.
 
 ## Workflow: From Idea to Implementation
 
-1.  **Discuss & Define**: Freely discuss ideas with an AI in any tool. Capture meeting notes and sparks of inspiration as `hints` or `knowledge_refs` to provide context for development.
-2.  **Plan & Design**: Use `current_task_init` to start a task. Collaborate with AI agents to create a high-level "Overall Plan."
-3.  **Code & Implement**: The agent focuses on the current plan, dynamically generating and executing "Steps." You can guide the agent at any time by adding `hints` manually or via other agents.
-4.  **Review & Document**: Once the task is complete, generate a Devlog with one click. Perfect for team sharing, technical reviews, or knowledge retention.
+1.  **Project Connection**: Use `connect_project` to bind the project to the MCP session, ensuring all AI agents collaborate within the same context.
+2.  **Discuss & Define**: Freely discuss ideas with an AI in any tool. Capture meeting notes and sparks of inspiration as `hints` or `knowledge_refs` to provide context for development.
+3.  **Plan & Design**: Use `current_task_init` to start a task. Collaborate with AI agents to create a high-level "Overall Plan."
+4.  **Code & Implement**: The agent focuses on the current plan, dynamically generating and executing "Steps." You can guide the agent at any time by adding `hints` manually or via other agents.
+5.  **Review & Document**: Once the task is complete, generate a Devlog with one click. Perfect for team sharing, technical reviews, or knowledge retention.
+
+## ⚠️ Important Notes
+
+**Tool Name Change**: Due to discovering potential naming conflicts with `project_bind` in certain IDEs, we've renamed it to `connect_project`. The functionality is identical - only the name has changed. If you encounter issues with tools not responding, please check that you're using the correct tool name.
 
 ## 🏗️ Architecture
 
