@@ -194,6 +194,10 @@ export const CurrentTaskInitSchema = {
         items: { type: 'string' as const },
         maxItems: 50,
       },
+      project_id: {
+        type: 'string' as const,
+        description: '项目ID（可选，覆盖默认绑定）',
+      },
     },
     required: ['title', 'goal'],
     additionalProperties: false,
@@ -237,6 +241,10 @@ export const CurrentTaskUpdateSchema = {
         description: '完成情况说明（完成时必填）',
         maxLength: 2000,
       },
+      project_id: {
+        type: 'string' as const,
+        description: '项目ID（可选，覆盖默认绑定）',
+      },
     },
     required: ['update_type', 'status'],
     additionalProperties: false,
@@ -273,6 +281,10 @@ export const CurrentTaskReadSchema = {
         minimum: 1,
         maximum: 1000,
         default: 50,
+      },
+      project_id: {
+        type: 'string' as const,
+        description: '项目ID（可选，覆盖默认绑定）',
       },
     },
     additionalProperties: false,
@@ -331,6 +343,10 @@ export const CurrentTaskModifySchema = {
         ],
         description: '变更类别',
       },
+      project_id: {
+        type: 'string' as const,
+        description: '项目ID（可选，覆盖默认绑定）',
+      },
     },
     required: ['field', 'content', 'reason', 'change_type'],
     additionalProperties: false,
@@ -356,6 +372,10 @@ export const CurrentTaskCompleteSchema = {
         type: 'boolean' as const,
         description: '是否生成文档',
         default: true,
+      },
+      project_id: {
+        type: 'string' as const,
+        description: '项目ID（可选，覆盖默认绑定）',
       },
     },
     required: ['summary'],
@@ -393,8 +413,51 @@ export const CurrentTaskLogSchema = {
         description: 'AI 的详细说明',
         maxLength: 2000,
       },
+      project_id: {
+        type: 'string' as const,
+        description: '项目ID（可选，覆盖默认绑定）',
+      },
     },
     required: ['category', 'action', 'message', 'notes'],
+    additionalProperties: false,
+  },
+};
+
+/**
+ * Project Bind 工具 Schema
+ */
+export const ProjectBindSchema = {
+  name: 'project_bind',
+  description:
+    '绑定项目到当前连接，提供稳定项目标识，确保文件写入项目根目录下的.wave文件夹中',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      project_id: {
+        type: 'string' as const,
+        description: '项目ID（可选，与project_path二选一）',
+        minLength: 1,
+      },
+      project_path: {
+        type: 'string' as const,
+        description: '项目路径（可选，与project_id二选一）',
+        minLength: 1,
+      },
+    },
+    additionalProperties: false,
+    oneOf: [{ required: ['project_id'] }, { required: ['project_path'] }],
+  },
+};
+
+/**
+ * Project Info 工具 Schema
+ */
+export const ProjectInfoSchema = {
+  name: 'project_info',
+  description: '获取当前连接的活跃项目信息',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {},
     additionalProperties: false,
   },
 };
@@ -411,6 +474,8 @@ export const ToolSchemas = {
   current_task_modify: CurrentTaskModifySchema,
   current_task_complete: CurrentTaskCompleteSchema,
   current_task_log: CurrentTaskLogSchema,
+  project_bind: ProjectBindSchema,
+  project_info: ProjectInfoSchema,
 } as const;
 
 /**
@@ -438,6 +503,22 @@ export function getTaskToolDefinitions() {
   ] as const;
 
   return taskTools.map((toolName) => {
+    const schema = ToolSchemas[toolName];
+    return {
+      name: schema.name,
+      description: schema.description,
+      inputSchema: schema.inputSchema,
+    };
+  });
+}
+
+/**
+ * 获取项目管理工具定义列表
+ */
+export function getProjectToolDefinitions() {
+  const projectTools = ['project_bind', 'project_info'] as const;
+
+  return projectTools.map((toolName) => {
     const schema = ToolSchemas[toolName];
     return {
       name: schema.name,
@@ -477,6 +558,13 @@ export function getToolInputSchema(toolName: string) {
  */
 export function isTaskManagementTool(toolName: string): boolean {
   return toolName.startsWith('current_task_');
+}
+
+/**
+ * 检查工具是否为项目管理工具
+ */
+export function isProjectManagementTool(toolName: string): boolean {
+  return toolName.startsWith('project_');
 }
 
 /**
@@ -763,15 +851,20 @@ export function generateExampleParams(toolName: string): any {
 export function getToolsStatistics() {
   const allTools = Object.keys(ToolSchemas);
   const taskTools = allTools.filter(isTaskManagementTool);
-  const systemTools = allTools.filter((name) => !isTaskManagementTool(name));
+  const projectTools = allTools.filter(isProjectManagementTool);
+  const systemTools = allTools.filter(
+    (name) => !isTaskManagementTool(name) && !isProjectManagementTool(name)
+  );
 
   return {
     total: allTools.length,
     taskManagement: taskTools.length,
+    projectManagement: projectTools.length,
     system: systemTools.length,
     tools: {
       all: allTools,
       taskManagement: taskTools,
+      projectManagement: projectTools,
       system: systemTools,
     },
   };

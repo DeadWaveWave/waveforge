@@ -133,6 +133,8 @@ export class Logger {
         return LogLevel.Error;
       case 'TEACH':
         return LogLevel.Teach;
+      case 'SILENT':
+        return LogLevel.Silent;
       default:
         return null;
     }
@@ -142,6 +144,11 @@ export class Logger {
    * 检查是否应该记录指定级别的日志
    */
   private shouldLog(level: LogLevel): boolean {
+    // SILENT 级别禁用所有日志
+    if (this.config.level === LogLevel.Silent) {
+      return false;
+    }
+
     const levels = [
       LogLevel.Info,
       LogLevel.Warning,

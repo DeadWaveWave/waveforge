@@ -23,6 +23,7 @@ export enum LogLevel {
   Warning = 'WARNING',
   Error = 'ERROR',
   Teach = 'TEACH',
+  Silent = 'SILENT',
 }
 
 /**
@@ -76,6 +77,102 @@ export interface ProjectRootInfo {
   root: string;
   source: 'client_roots' | 'cwd_fallback';
   available: boolean;
+}
+
+/**
+ * 项目身份信息（本地身份证，不含root）
+ * 存储在 .wave/project.json 中
+ */
+export interface ProjectInfo {
+  /** 项目唯一标识符 */
+  id: string;
+  /** 项目slug（用于显示和引用） */
+  slug: string;
+  /** 项目来源（可选，如Git仓库URL） */
+  origin?: string;
+}
+
+/**
+ * 项目记录（解析后的项目记录，含root）
+ * 存储在全局注册表 ~/.wave/projects.json 中
+ */
+export interface ProjectRecord {
+  /** 项目唯一标识符 */
+  id: string;
+  /** 项目根目录路径 */
+  root: string;
+  /** 项目slug（用于显示和引用） */
+  slug: string;
+  /** 项目来源（可选，如Git仓库URL） */
+  origin?: string;
+  /** 最后访问时间 */
+  last_seen?: string;
+}
+
+/**
+ * 全局项目注册表结构
+ * 存储在 ~/.wave/projects.json 中
+ */
+export interface GlobalProjectRegistry {
+  /** 项目记录映射表：project_id -> ProjectRecord */
+  projects: Record<string, ProjectRecord>;
+  /** 注册表版本 */
+  version: string;
+  /** 最后更新时间 */
+  updated_at: string;
+}
+
+/**
+ * 连接级项目绑定状态
+ * 每个MCP连接维护一个活跃项目绑定
+ */
+export interface ActiveProjectBinding {
+  /** 当前绑定的项目ID */
+  project_id: string;
+  /** 项目根目录路径 */
+  root: string;
+  /** 项目slug */
+  slug: string;
+  /** 项目来源 */
+  origin?: string;
+  /** 绑定时间 */
+  bound_at: string;
+}
+
+/**
+ * project_bind 工具参数
+ */
+export interface ProjectBindParams {
+  /** 项目ID（可选，与project_path二选一） */
+  project_id?: string;
+  /** 项目路径（可选，与project_id二选一） */
+  project_path?: string;
+}
+
+/**
+ * project_bind 工具响应
+ */
+export interface ProjectBindResponse {
+  /** 绑定的项目信息 */
+  project: {
+    id: string;
+    root: string;
+    slug: string;
+    origin?: string;
+  };
+}
+
+/**
+ * project_info 工具响应
+ */
+export interface ProjectInfoResponse {
+  /** 当前活跃项目信息 */
+  project: {
+    id: string;
+    root: string;
+    slug: string;
+    origin?: string;
+  };
 }
 
 /**

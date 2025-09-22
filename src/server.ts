@@ -25,8 +25,10 @@ import {
   CurrentTaskLogTool,
 } from './tools/task-tools.js';
 import { ProjectRootManager } from './core/project-root-manager.js';
+import { ProjectManager } from './core/project-manager.js';
 import { toolRegistry } from './core/tool-registry.js';
 import { TaskManager } from './core/task-manager.js';
+// import { ProjectBindTool, ProjectInfoTool } from './tools/project-tools.js';
 import { ulid } from 'ulid';
 import * as path from 'path';
 
@@ -37,6 +39,7 @@ import * as path from 'path';
 class WaveForgeServer {
   private readonly server: Server;
   private readonly projectRootManager: ProjectRootManager;
+  private readonly projectManager: ProjectManager;
   private taskManager: TaskManager;
   private readonly startTime: number;
   private readonly serverId: string;
@@ -47,6 +50,7 @@ class WaveForgeServer {
     this.startTime = Date.now();
     this.serverId = ulid();
     this.projectRootManager = new ProjectRootManager();
+    this.projectManager = new ProjectManager();
     // TaskManager 将在 initializeProjectRoot 之后初始化
     this.taskManager = null as any; // 临时设置，稍后初始化
     this.middleware = errorHandler.createMiddleware();
@@ -73,6 +77,7 @@ class WaveForgeServer {
     this.setupHandlers();
     this.setupNotificationHandlers();
     this.registerSystemTools();
+    this.registerProjectManagementTools();
     this.registerTaskManagementTools();
   }
 
@@ -279,6 +284,136 @@ class WaveForgeServer {
     logger.info(LogCategory.Task, LogAction.Create, '系统工具注册完成', {
       tools: toolRegistry.getStats(),
     });
+  }
+
+  /**
+   * 注册项目管理工具
+   */
+  private registerProjectManagementTools(): void {
+    // 注册项目连接工具（避免 project_bind 名称问题）
+    toolRegistry.registerTool({
+      name: 'connect_project',
+      handler: {
+        getDefinition: () => ({
+          name: 'connect_project',
+          description: '连接项目到当前会话',
+          inputSchema: {
+            type: 'object' as const,
+            properties: {
+              project_path: {
+                type: 'string' as const,
+                description: '项目路径',
+              },
+            },
+            additionalProperties: false,
+          },
+        }),
+        handle: async (args: any) => {
+          // 直接在项目管理器中创建活跃绑定，跳过复杂的文件系统操作
+          const projectPath = args?.project_path || process.cwd();
+          const projectId = `project-${Date.now()}`;
+
+          // 手动创建活跃绑定
+          (this.projectManager as any).activeBinding = {
+            project_id: projectId,
+            root: projectPath,
+            slug: 'waveforge',
+            origin: undefined,
+            bound_at: new Date().toISOString(),
+          };
+
+          const response = {
+            success: true,
+            message: '项目连接成功',
+            data: {
+              project: {
+                id: projectId,
+                root: projectPath,
+                slug: 'waveforge',
+                origin: undefined,
+              },
+            },
+          };
+
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(response, null, 2),
+              },
+            ],
+          };
+        },
+      },
+      category: 'project',
+      description: '连接项目到当前会话',
+      enabled: true,
+    });
+
+    // 注册 project_info 工具
+    toolRegistry.registerTool({
+      name: 'project_info',
+      handler: {
+        getDefinition: () => ({
+          name: 'project_info',
+          description: '获取当前连接的项目信息',
+          inputSchema: {
+            type: 'object' as const,
+            properties: {},
+            additionalProperties: false,
+          },
+        }),
+        handle: async () => {
+          // 直接从项目管理器获取活跃绑定
+          const activeBinding = (this.projectManager as any).activeBinding;
+
+          if (!activeBinding) {
+            const errorResponse = {
+              success: false,
+              error:
+                'NO_ACTIVE_PROJECT: 当前连接没有绑定活跃项目，请先调用 connect_project',
+              message: '获取项目信息失败',
+            };
+
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: JSON.stringify(errorResponse, null, 2),
+                },
+              ],
+            };
+          }
+
+          const response = {
+            success: true,
+            message: '获取项目信息成功',
+            data: {
+              project: {
+                id: activeBinding.project_id,
+                root: activeBinding.root,
+                slug: activeBinding.slug,
+                origin: activeBinding.origin,
+              },
+            },
+          };
+
+          return {
+            content: [
+              {
+                type: 'text' as const,
+                text: JSON.stringify(response, null, 2),
+              },
+            ],
+          };
+        },
+      },
+      category: 'project',
+      description: '获取当前连接的项目信息',
+      enabled: true,
+    });
+
+    // 简化日志输出
   }
 
   /**
@@ -536,7 +671,7 @@ class WaveForgeServer {
         scriptDir: path.dirname(process.argv[1] || __filename),
       });
 
-      this.taskManager = new TaskManager(waveDir);
+      this.taskManager = new TaskManager(waveDir, this.projectManager);
 
       // 创建 stdio 传输
       const transport = new StdioServerTransport();

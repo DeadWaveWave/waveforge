@@ -120,6 +120,7 @@ export class CurrentTaskInitTool extends BaseTaskTool {
         description: params.description,
         knowledge_refs: params.knowledge_refs || [],
         overall_plan: params.overall_plan || [],
+        project_id: params.project_id,
       });
 
       this.logOperation(LogCategory.Task, LogAction.Create, '任务初始化完成', {
@@ -208,6 +209,7 @@ export class CurrentTaskUpdateTool extends BaseTaskTool {
         status: params.status as TaskStatus,
         evidence: params.evidence,
         notes: params.notes,
+        project_id: params.project_id,
       });
 
       this.logOperation(
@@ -279,7 +281,7 @@ export class CurrentTaskReadTool extends BaseTaskTool {
       );
 
       // 获取当前任务
-      const task = await this.taskManager.getCurrentTask();
+      const task = await this.taskManager.getCurrentTask(params.project_id);
       if (!task) {
         throw new NotFoundError('当前没有活跃任务');
       }
@@ -560,6 +562,7 @@ export class CurrentTaskModifyTool extends BaseTaskTool {
         plan_id: params.plan_id,
         step_id: params.step_id,
         change_type: params.change_type,
+        project_id: params.project_id,
       });
 
       this.logOperation(
@@ -622,7 +625,10 @@ export class CurrentTaskCompleteTool extends BaseTaskTool {
       });
 
       // 调用 TaskManager 完成任务
-      const result = await this.taskManager.completeTask(params.summary);
+      const result = await this.taskManager.completeTask(
+        params.summary,
+        params.project_id
+      );
 
       this.logOperation(LogCategory.Task, LogAction.Update, '任务完成', {
         archivedTaskId: result.archived_task_id,
@@ -702,6 +708,7 @@ export class CurrentTaskLogTool extends BaseTaskTool {
         action: params.action.toUpperCase() as LogAction,
         message: params.message,
         ai_notes: params.notes,
+        project_id: params.project_id,
       });
 
       this.logOperation(

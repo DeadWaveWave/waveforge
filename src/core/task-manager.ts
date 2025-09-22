@@ -29,6 +29,7 @@ export interface TaskInitParams {
   description?: string;
   knowledge_refs?: string[];
   overall_plan?: string[];
+  project_id?: string;
 }
 
 /**
@@ -53,6 +54,7 @@ export interface TaskUpdateParams {
   status: TaskStatus;
   evidence?: string;
   notes?: string;
+  project_id?: string;
 }
 
 /**
@@ -89,6 +91,7 @@ export interface TaskModifyParams {
     | 'bug_fix_replan'
     | 'user_request'
     | 'scope_change';
+  project_id?: string;
 }
 
 /**
@@ -114,14 +117,19 @@ export interface TaskModifyResult {
 export class TaskManager {
   private docsPath: string;
   private currentTaskPath: string;
+  private projectManager?: import('./project-manager.js').ProjectManager;
 
-  constructor(docsPath: string) {
+  constructor(
+    docsPath: string,
+    projectManager?: import('./project-manager.js').ProjectManager
+  ) {
     if (!docsPath || docsPath.trim() === '') {
       throw new Error('docsPath 不能为空');
     }
 
     this.docsPath = docsPath.trim();
     this.currentTaskPath = path.join(this.docsPath, 'current-task.json');
+    this.projectManager = projectManager;
   }
 
   getDocsPath(): string {
@@ -130,6 +138,46 @@ export class TaskManager {
 
   getCurrentTaskPath(): string {
     return this.currentTaskPath;
+  }
+
+  /**
+   * 解析项目特定的文档路径
+   */
+  private async resolveProjectPath(projectId?: string): Promise<string> {
+    if (!this.projectManager || !projectId) {
+      return this.docsPath;
+    }
+
+    try {
+      // 如果提供了项目ID，尝试从项目注册表解析项目根目录
+      const projectRegistry = this.projectManager.getProjectRegistry();
+      const projectRecord = await projectRegistry.resolveProject(projectId);
+
+      if (projectRecord) {
+        return path.join(projectRecord.root, '.wave');
+      }
+    } catch (error) {
+      // 如果解析失败，使用默认路径
+      logger.warning(
+        LogCategory.Task,
+        LogAction.Handle,
+        '项目路径解析失败，使用默认路径',
+        {
+          projectId,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
+
+    return this.docsPath;
+  }
+
+  /**
+   * 解析项目特定的任务文件路径
+   */
+  private async resolveTaskPath(projectId?: string): Promise<string> {
+    const docsPath = await this.resolveProjectPath(projectId);
+    return path.join(docsPath, 'current-task.json');
   }
 
   /**
@@ -173,6 +221,7 @@ export class TaskManager {
           slug,
           plan_count: overallPlan.length,
           has_story: !!story,
+          project_id: params.project_id,
         },
       };
 
@@ -192,8 +241,8 @@ export class TaskManager {
         updated_at: timestamp,
       };
 
-      await this.ensureDirectoryExists();
-      await this.saveTask(task);
+      await this.ensureDirectoryExists(params.project_id);
+      await this.saveTask(task, params.project_id);
 
       return {
         success: true,
@@ -206,6 +255,7 @@ export class TaskManager {
     } catch (error) {
       logger.error(LogCategory.Task, LogAction.Create, '任务初始化失败', {
         error: error instanceof Error ? error.message : String(error),
+        project_id: params.project_id,
       });
       throw error;
     }
@@ -218,7 +268,7 @@ export class TaskManager {
     try {
       this.validateUpdateParams(params);
 
-      const task = await this.getCurrentTask();
+      const task = await this.getCurrentTask(params.project_id);
       if (!task) {
         throw new Error('当前没有活跃的任务');
       }
@@ -233,7 +283,7 @@ export class TaskManager {
       }
 
       task.updated_at = timestamp;
-      await this.saveTask(task);
+      await this.saveTask(task, params.project_id);
 
       // 添加提示信息
       result.hints = this.getActiveHints(task, params);
@@ -242,6 +292,7 @@ export class TaskManager {
     } catch (error) {
       logger.error(LogCategory.Plan, LogAction.Update, '任务状态更新失败', {
         error: error instanceof Error ? error.message : String(error),
+        project_id: params.project_id,
       });
       throw error;
     }
@@ -254,7 +305,7 @@ export class TaskManager {
     try {
       this.validateModifyParams(params);
 
-      const task = await this.getCurrentTask();
+      const task = await this.getCurrentTask(params.project_id);
       if (!task) {
         throw new Error('当前没有活跃的任务');
       }
@@ -280,12 +331,13 @@ export class TaskManager {
       }
 
       task.updated_at = timestamp;
-      await this.saveTask(task);
+      await this.saveTask(task, params.project_id);
 
       return result;
     } catch (error) {
       logger.error(LogCategory.Task, LogAction.Modify, '任务修改失败', {
         error: error instanceof Error ? error.message : String(error),
+        project_id: params.project_id,
       });
       throw error;
     }
@@ -294,14 +346,16 @@ export class TaskManager {
   /**
    * 获取当前任务
    */
-  async getCurrentTask(): Promise<CurrentTask | null> {
+  async getCurrentTask(projectId?: string): Promise<CurrentTask | null> {
     try {
+      const taskPath = await this.resolveTaskPath(projectId);
+
       // 检查文件是否存在
-      if (!(await fs.pathExists(this.currentTaskPath))) {
+      if (!(await fs.pathExists(taskPath))) {
         return null;
       }
 
-      const data = await fs.readFile(this.currentTaskPath, 'utf8');
+      const data = await fs.readFile(taskPath, 'utf8');
 
       if (!data || data.trim() === '') {
         return null;
@@ -332,9 +386,12 @@ export class TaskManager {
   /**
    * 完成当前任务
    */
-  async completeTask(summary: string): Promise<{ archived_task_id: string }> {
+  async completeTask(
+    summary: string,
+    projectId?: string
+  ): Promise<{ archived_task_id: string }> {
     try {
-      const task = await this.getCurrentTask();
+      const task = await this.getCurrentTask(projectId);
       if (!task) {
         throw new Error('当前没有活跃的任务');
       }
@@ -359,14 +416,15 @@ export class TaskManager {
       task.logs.push(completeLog);
 
       // 保存最终状态
-      await this.saveTask(task);
+      await this.saveTask(task, projectId);
 
       // 归档任务到历史目录
-      await this.archiveTask(task);
+      await this.archiveTask(task, projectId);
 
       // 删除当前任务文件
       try {
-        await fs.remove(this.currentTaskPath);
+        const taskPath = await this.resolveTaskPath(projectId);
+        await fs.remove(taskPath);
       } catch (error) {
         // 忽略删除错误
       }
@@ -397,9 +455,10 @@ export class TaskManager {
     message: string;
     ai_notes?: string;
     details?: Record<string, any>;
+    project_id?: string;
   }): Promise<{ log_id: string; timestamp: string }> {
     try {
-      const task = await this.getCurrentTask();
+      const task = await this.getCurrentTask(params.project_id);
       if (!task) {
         throw new Error('当前没有活跃的任务');
       }
@@ -423,7 +482,7 @@ export class TaskManager {
       task.logs.push(log);
       task.updated_at = timestamp;
 
-      await this.saveTask(task);
+      await this.saveTask(task, params.project_id);
 
       logger.info(params.category, params.action, '活动日志记录', {
         logId,
@@ -549,19 +608,21 @@ export class TaskManager {
     };
   }
 
-  private async ensureDirectoryExists(): Promise<void> {
+  private async ensureDirectoryExists(projectId?: string): Promise<void> {
+    const docsPath = await this.resolveProjectPath(projectId);
     try {
-      await fs.access(this.docsPath);
+      await fs.access(docsPath);
     } catch {
-      await fs.mkdir(this.docsPath, { recursive: true });
+      await fs.mkdir(docsPath, { recursive: true });
     }
   }
 
-  private async saveTask(task: CurrentTask): Promise<void> {
+  private async saveTask(task: CurrentTask, projectId?: string): Promise<void> {
     // 确保目录存在
-    await this.ensureDirectoryExists();
+    await this.ensureDirectoryExists(projectId);
+    const taskPath = await this.resolveTaskPath(projectId);
     const taskData = JSON.stringify(task, null, 2);
-    await fs.writeFile(this.currentTaskPath, taskData, 'utf8');
+    await fs.writeFile(taskPath, taskData, 'utf8');
   }
 
   private validateUpdateParams(params: TaskUpdateParams): void {
@@ -841,9 +902,13 @@ export class TaskManager {
   /**
    * 归档任务到历史目录
    */
-  private async archiveTask(task: CurrentTask): Promise<void> {
+  private async archiveTask(
+    task: CurrentTask,
+    projectId?: string
+  ): Promise<void> {
     try {
-      const historyDir = path.join(this.docsPath, 'history');
+      const docsPath = await this.resolveProjectPath(projectId);
+      const historyDir = path.join(docsPath, 'history');
       await fs.ensureDir(historyDir);
 
       const historyFile = path.join(historyDir, `${task.id}.json`);
@@ -853,6 +918,7 @@ export class TaskManager {
       // 归档失败不应该阻止任务完成
       logger.error(LogCategory.Task, LogAction.Update, '任务归档失败', {
         taskId: task.id,
+        projectId,
         error: error instanceof Error ? error.message : String(error),
       });
     }
