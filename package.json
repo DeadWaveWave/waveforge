@@ -2,27 +2,69 @@
   "name": "waveforge",
   "version": "0.1.0",
   "description": "WaveForge MCP 任务管理系统 - 双层级任务管理解决方案，专为AI代理协同工作设计",
-  "main": "dist/server.js",
+  "main": "dist/cjs/server.cjs",
+  "module": "dist/esm/server.js",
+  "types": "dist/esm/server.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/server.d.ts",
+      "import": "./dist/esm/server.js",
+      "require": "./dist/cjs/server.cjs"
+    },
+    "./core/*": {
+      "types": "./dist/esm/core/*.d.ts",
+      "import": "./dist/esm/core/*.js",
+      "require": "./dist/cjs/core/*.cjs"
+    },
+    "./tools/*": {
+      "types": "./dist/esm/tools/*.d.ts",
+      "import": "./dist/esm/tools/*.js",
+      "require": "./dist/cjs/tools/*.cjs"
+    },
+    "./types/*": {
+      "types": "./dist/esm/types/*.d.ts",
+      "import": "./dist/esm/types/*.js",
+      "require": "./dist/cjs/types/*.cjs"
+    }
+  },
   "scripts": {
     "dev": "tsx src/server.ts",
+    "dev:watch": "tsx watch src/server.ts",
+    "dev:debug": "tsx --inspect src/server.ts",
     "build": "tsup",
+    "build:esm": "tsup --config tsup.config.ts --format esm",
+    "build:cjs": "tsup --config tsup.config.ts --format cjs",
     "build:watch": "tsup --watch",
+    "build:clean": "pnpm run clean && pnpm run build",
     "start": "node dist/server.js",
+    "start:esm": "node dist/esm/server.js",
+    "start:cjs": "node dist/cjs/server.cjs",
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:coverage": "vitest --coverage",
     "test:ui": "vitest --ui",
+    "test:unit": "vitest --run src/**/*.test.ts",
+    "test:integration": "vitest --run src/**/*.integration.test.ts",
     "type-check": "tsc --noEmit",
+    "type-check:watch": "tsc --noEmit --watch",
     "lint": "eslint src --ext .ts",
     "lint:fix": "eslint src --ext .ts --fix",
+    "lint:watch": "nodemon --exec \"pnpm run lint\" --watch src --ext ts",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "format:watch": "nodemon --exec \"pnpm run format\" --watch src --ext ts,js,json,md",
     "clean": "rm -rf dist coverage .nyc_output",
+    "clean:all": "pnpm run clean && rm -rf node_modules",
     "prepare": "husky",
     "prepack": "pnpm run build",
+    "prepublishOnly": "pnpm run ci && pnpm run build",
     "ci": "pnpm run type-check && pnpm run lint && pnpm run test",
-    "release": "pnpm run ci && pnpm run build"
+    "ci:full": "pnpm run clean && pnpm run ci && pnpm run build && pnpm run test:coverage",
+    "release": "pnpm run ci:full",
+    "health": "node -e \"console.log('Node.js version:', process.version); console.log('Platform:', process.platform); console.log('Architecture:', process.arch);\"",
+    "deps:check": "pnpm outdated",
+    "deps:update": "pnpm update --latest"
   },
   "keywords": [
     "mcp",

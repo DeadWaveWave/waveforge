@@ -104,21 +104,69 @@ export class SystemError extends WaveForgeError {
 }
 
 /**
+ * 错误处理器配置
+ */
+export interface ErrorHandlerConfig {
+  logLevel: LogLevel;
+  includeStackTrace: boolean;
+  maxContextSize: number;
+  enableMetrics: boolean;
+}
+
+/**
+ * 错误统计信息
+ */
+export interface ErrorMetrics {
+  total: number;
+  byType: Record<string, number>;
+  byCategory: Record<string, number>;
+  recent: Array<{
+    timestamp: string;
+    type: string;
+    message: string;
+  }>;
+}
+
+/**
  * 错误处理器类
  */
 export class ErrorHandler {
   private static instance: ErrorHandler;
+  private readonly config: ErrorHandlerConfig;
+  private readonly metrics: ErrorMetrics;
 
-  private constructor() {}
+  private constructor(config?: Partial<ErrorHandlerConfig>) {
+    this.config = {
+      logLevel: LogLevel.Error,
+      includeStackTrace: true,
+      maxContextSize: 1000,
+      enableMetrics: true,
+      ...config,
+    };
+
+    this.metrics = {
+      total: 0,
+      byType: {},
+      byCategory: {},
+      recent: [],
+    };
+  }
 
   /**
    * 获取单例实例
    */
-  static getInstance(): ErrorHandler {
+  static getInstance(config?: Partial<ErrorHandlerConfig>): ErrorHandler {
     if (!ErrorHandler.instance) {
-      ErrorHandler.instance = new ErrorHandler();
+      ErrorHandler.instance = new ErrorHandler(config);
     }
     return ErrorHandler.instance;
+  }
+
+  /**
+   * 重置实例（主要用于测试）
+   */
+  static resetInstance(): void {
+    ErrorHandler.instance = undefined as any;
   }
 
   /**
@@ -133,6 +181,7 @@ export class ErrorHandler {
     type: string;
     timestamp: string;
     context?: Record<string, any>;
+    stack?: string;
   } {
     let waveForgeError: WaveForgeError;
 
@@ -167,16 +216,31 @@ export class ErrorHandler {
       });
     }
 
-    // 记录错误日志
+    // 记录错误日志和统计
     this.logError(waveForgeError);
+    this.updateMetrics(waveForgeError);
 
-    return {
+    const response: {
+      success: false;
+      error: string;
+      type: string;
+      timestamp: string;
+      context?: Record<string, any>;
+      stack?: string;
+    } = {
       success: false,
       error: waveForgeError.message,
       type: waveForgeError.type,
       timestamp: waveForgeError.timestamp,
-      context: waveForgeError.context,
+      context: this.sanitizeContext(waveForgeError.context),
     };
+
+    // 根据配置决定是否包含堆栈跟踪
+    if (this.config.includeStackTrace && waveForgeError.stack) {
+      response.stack = waveForgeError.stack;
+    }
+
+    return response;
   }
 
   /**
@@ -191,13 +255,118 @@ export class ErrorHandler {
       message: error.message,
       details: {
         type: error.type,
-        context: error.context,
-        stack: error.stack,
+        context: this.sanitizeContext(error.context),
+        ...(this.config.includeStackTrace && { stack: error.stack }),
       },
     };
 
     // 输出到 stderr（MCP 服务器的标准做法）
     console.error('[WaveForge Error]', JSON.stringify(logEntry, null, 2));
+  }
+
+  /**
+   * 更新错误统计
+   */
+  private updateMetrics(error: WaveForgeError): void {
+    if (!this.config.enableMetrics) {
+      return;
+    }
+
+    this.metrics.total++;
+    this.metrics.byType[error.type] =
+      (this.metrics.byType[error.type] || 0) + 1;
+    this.metrics.byCategory[LogCategory.Exception] =
+      (this.metrics.byCategory[LogCategory.Exception] || 0) + 1;
+
+    // 保留最近的错误记录（最多100条）
+    this.metrics.recent.unshift({
+      timestamp: error.timestamp,
+      type: error.type,
+      message: error.message,
+    });
+
+    if (this.metrics.recent.length > 100) {
+      this.metrics.recent = this.metrics.recent.slice(0, 100);
+    }
+  }
+
+  /**
+   * 清理上下文数据，防止敏感信息泄露
+   */
+  private sanitizeContext(
+    context?: Record<string, any>
+  ): Record<string, any> | undefined {
+    if (!context) {
+      return undefined;
+    }
+
+    const sanitized = { ...context };
+    const sensitiveKeys = ['password', 'token', 'secret', 'key', 'auth'];
+
+    // 递归清理敏感信息
+    const sanitizeObject = (obj: any): any => {
+      if (typeof obj !== 'object' || obj === null) {
+        return obj;
+      }
+
+      if (Array.isArray(obj)) {
+        return obj.map(sanitizeObject);
+      }
+
+      const result: any = {};
+      for (const [key, value] of Object.entries(obj)) {
+        const lowerKey = key.toLowerCase();
+        if (sensitiveKeys.some((sensitive) => lowerKey.includes(sensitive))) {
+          result[key] = '[REDACTED]';
+        } else {
+          result[key] = sanitizeObject(value);
+        }
+      }
+      return result;
+    };
+
+    const sanitizedContext = sanitizeObject(sanitized);
+
+    // 限制上下文大小
+    const contextStr = JSON.stringify(sanitizedContext);
+    if (contextStr.length > this.config.maxContextSize) {
+      return {
+        ...sanitizedContext,
+        _truncated: true,
+        _originalSize: contextStr.length,
+      };
+    }
+
+    return sanitizedContext;
+  }
+
+  /**
+   * 获取错误统计信息
+   */
+  getMetrics(): ErrorMetrics {
+    return {
+      ...this.metrics,
+      byType: { ...this.metrics.byType },
+      byCategory: { ...this.metrics.byCategory },
+      recent: [...this.metrics.recent],
+    };
+  }
+
+  /**
+   * 清空错误统计
+   */
+  clearMetrics(): void {
+    this.metrics.total = 0;
+    this.metrics.byType = {};
+    this.metrics.byCategory = {};
+    this.metrics.recent = [];
+  }
+
+  /**
+   * 获取配置信息
+   */
+  getConfig(): ErrorHandlerConfig {
+    return { ...this.config };
   }
 
   /**
@@ -256,9 +425,167 @@ export class ErrorHandler {
     if (errors.length > 0) {
       throw new ValidationError(`参数类型错误: ${errors.join('; ')}`, {
         errors,
-        params,
+        params: this.sanitizeContext(params),
       });
     }
+  }
+
+  /**
+   * 验证字符串长度
+   */
+  validateStringLength(
+    value: string,
+    fieldName: string,
+    minLength?: number,
+    maxLength?: number
+  ): void {
+    if (minLength !== undefined && value.length < minLength) {
+      throw new ValidationError(
+        `${fieldName} 长度不能少于 ${minLength} 个字符`,
+        { fieldName, actualLength: value.length, minLength }
+      );
+    }
+
+    if (maxLength !== undefined && value.length > maxLength) {
+      throw new ValidationError(
+        `${fieldName} 长度不能超过 ${maxLength} 个字符`,
+        { fieldName, actualLength: value.length, maxLength }
+      );
+    }
+  }
+
+  /**
+   * 验证数组长度
+   */
+  validateArrayLength(
+    value: any[],
+    fieldName: string,
+    minLength?: number,
+    maxLength?: number
+  ): void {
+    if (minLength !== undefined && value.length < minLength) {
+      throw new ValidationError(`${fieldName} 至少需要 ${minLength} 个元素`, {
+        fieldName,
+        actualLength: value.length,
+        minLength,
+      });
+    }
+
+    if (maxLength !== undefined && value.length > maxLength) {
+      throw new ValidationError(`${fieldName} 最多只能有 ${maxLength} 个元素`, {
+        fieldName,
+        actualLength: value.length,
+        maxLength,
+      });
+    }
+  }
+
+  /**
+   * 验证枚举值
+   */
+  validateEnum<T>(value: T, fieldName: string, allowedValues: T[]): void {
+    if (!allowedValues.includes(value)) {
+      throw new ValidationError(
+        `${fieldName} 必须是以下值之一: ${allowedValues.join(', ')}`,
+        { fieldName, value, allowedValues }
+      );
+    }
+  }
+
+  /**
+   * 创建错误处理中间件
+   */
+  createMiddleware() {
+    return {
+      /**
+       * 包装 MCP 工具处理器
+       */
+      wrapToolHandler: <T extends any[], R>(
+        handler: (...args: T) => Promise<R>,
+        toolName: string
+      ) => {
+        return async (...args: T): Promise<R> => {
+          try {
+            return await handler(...args);
+          } catch (error) {
+            const errorResponse = this.handleError(error, {
+              tool: toolName,
+              args: this.sanitizeContext({ args }),
+            });
+
+            // 返回 MCP 标准错误响应格式
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(errorResponse, null, 2),
+                },
+              ],
+            } as R;
+          }
+        };
+      },
+
+      /**
+       * 包装异步操作
+       */
+      wrapAsync: <T extends any[], R>(
+        fn: (...args: T) => Promise<R>,
+        context?: Record<string, any>
+      ) => {
+        return this.wrapAsync(fn, context);
+      },
+    };
+  }
+
+  /**
+   * 检查错误是否为特定类型
+   */
+  isErrorType(error: unknown, type: ErrorType): boolean {
+    return error instanceof WaveForgeError && error.type === type;
+  }
+
+  /**
+   * 检查错误是否为可恢复错误
+   */
+  isRecoverableError(error: unknown): boolean {
+    if (error instanceof WaveForgeError) {
+      return [ErrorType.NetworkError, ErrorType.ConcurrencyError].includes(
+        error.type
+      );
+    }
+    return false;
+  }
+
+  /**
+   * 格式化错误消息用于用户显示
+   */
+  formatUserMessage(error: unknown): string {
+    if (error instanceof ValidationError) {
+      return error.message;
+    }
+
+    if (error instanceof NotFoundError) {
+      return error.message;
+    }
+
+    if (error instanceof WaveForgeError) {
+      // 对于系统错误，返回更友好的消息
+      switch (error.type) {
+        case ErrorType.FileSystemError:
+          return '文件操作失败，请检查文件权限和磁盘空间';
+        case ErrorType.ConcurrencyError:
+          return '操作冲突，请稍后重试';
+        case ErrorType.NetworkError:
+          return '网络连接失败，请检查网络设置';
+        case ErrorType.SystemError:
+          return '系统错误，请联系管理员';
+        default:
+          return '操作失败，请重试';
+      }
+    }
+
+    return '未知错误，请重试';
   }
 }
 

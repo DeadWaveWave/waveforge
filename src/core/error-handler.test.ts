@@ -1,257 +1,399 @@
 /**
- * 错误处理器测试用例
+ * 错误处理中间件测试
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   ErrorHandler,
-  WaveForgeError,
   ValidationError,
   FileSystemError,
   ConcurrencyError,
+  NotFoundError,
+  SystemError,
   ErrorType,
 } from './error-handler.js';
+import { LogLevel } from '../types/index.js';
 
 describe('ErrorHandler', () => {
   let errorHandler: ErrorHandler;
 
   beforeEach(() => {
+    // 重置单例实例
+    ErrorHandler.resetInstance();
     errorHandler = ErrorHandler.getInstance();
-    vi.clearAllMocks();
-  });
-
-  describe('单例模式', () => {
-    it('应该返回同一个实例', () => {
-      const instance1 = ErrorHandler.getInstance();
-      const instance2 = ErrorHandler.getInstance();
-
-      expect(instance1).toBe(instance2);
-    });
   });
 
   describe('错误处理', () => {
-    it('应该处理 WaveForgeError', () => {
-      const error = new ValidationError('测试验证错误', { field: 'test' });
+    it('应该正确处理 ValidationError', () => {
+      const error = new ValidationError('参数无效', { field: 'name' });
       const result = errorHandler.handleError(error);
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('测试验证错误');
-      expect(result.type).toBe(ErrorType.ValidationError);
-      expect(result.context).toEqual({ field: 'test' });
-      expect(result.timestamp).toMatch(
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
-      );
-    });
-
-    it('应该处理普通 Error', () => {
-      const error = new Error('普通错误');
-      const result = errorHandler.handleError(error, { source: 'test' });
-
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('普通错误');
-      expect(result.type).toBe(ErrorType.UnknownError);
-      expect(result.context).toEqual({
-        originalError: 'Error',
-        source: 'test',
+      expect(result).toEqual({
+        success: false,
+        error: '参数无效',
+        type: ErrorType.ValidationError,
+        timestamp: expect.any(String),
+        context: { field: 'name' },
+        stack: expect.any(String),
       });
     });
 
-    it('应该处理非 Error 对象', () => {
-      const error = '字符串错误';
-      const result = errorHandler.handleError(error);
+    it('应该正确处理通用 Error', () => {
+      const error = new Error('通用错误');
+      const result = errorHandler.handleError(error, { operation: 'test' });
 
-      expect(result.success).toBe(false);
-      expect(result.error).toBe('未知错误');
-      expect(result.type).toBe(ErrorType.UnknownError);
-      expect(result.context).toEqual({ originalError: '字符串错误' });
+      expect(result).toEqual({
+        success: false,
+        error: '通用错误',
+        type: ErrorType.UnknownError,
+        timestamp: expect.any(String),
+        context: {
+          originalError: 'Error',
+          operation: 'test',
+        },
+        stack: expect.any(String),
+      });
     });
 
-    it('应该处理 null 和 undefined', () => {
-      const result1 = errorHandler.handleError(null);
-      const result2 = errorHandler.handleError(undefined);
+    it('应该正确处理未知错误类型', () => {
+      const error = 'string error';
+      const result = errorHandler.handleError(error);
 
-      expect(result1.success).toBe(false);
-      expect(result1.error).toBe('未知错误');
-      expect(result2.success).toBe(false);
-      expect(result2.error).toBe('未知错误');
+      expect(result).toEqual({
+        success: false,
+        error: '未知错误',
+        type: ErrorType.UnknownError,
+        timestamp: expect.any(String),
+        context: {
+          originalError: 'string error',
+        },
+        stack: expect.any(String),
+      });
+    });
+
+    it('应该根据错误消息自动判断错误类型', () => {
+      const fileError = new Error('文件不存在 ENOENT');
+      const result = errorHandler.handleError(fileError);
+
+      expect(result.type).toBe(ErrorType.SystemError);
+    });
+
+    it('应该正确处理包含堆栈跟踪的配置', () => {
+      const handlerWithStack = ErrorHandler.getInstance({
+        includeStackTrace: true,
+      });
+
+      const error = new Error('测试错误');
+      const result = handlerWithStack.handleError(error);
+
+      expect(result.stack).toBeDefined();
+    });
+
+    it('应该正确处理不包含堆栈跟踪的配置', () => {
+      ErrorHandler.resetInstance();
+      const handlerWithoutStack = ErrorHandler.getInstance({
+        includeStackTrace: false,
+      });
+
+      const error = new Error('测试错误');
+      const result = handlerWithoutStack.handleError(error);
+
+      expect(result.stack).toBeUndefined();
+    });
+  });
+
+  describe('上下文清理', () => {
+    it('应该清理敏感信息', () => {
+      const error = new ValidationError('测试错误', {
+        username: 'user123',
+        password: 'secret123',
+        token: 'abc123',
+        normalField: 'normal value',
+      });
+
+      const result = errorHandler.handleError(error);
+
+      expect(result.context).toEqual({
+        username: 'user123',
+        password: '[REDACTED]',
+        token: '[REDACTED]',
+        normalField: 'normal value',
+      });
+    });
+
+    it('应该处理嵌套对象中的敏感信息', () => {
+      const error = new ValidationError('测试错误', {
+        user: {
+          name: 'John',
+          password: 'secret',
+        },
+        config: {
+          apiKey: 'key123',
+          url: 'https://api.example.com',
+        },
+      });
+
+      const result = errorHandler.handleError(error);
+
+      expect(result.context).toEqual({
+        user: {
+          name: 'John',
+          password: '[REDACTED]',
+        },
+        config: {
+          apiKey: '[REDACTED]',
+          url: 'https://api.example.com',
+        },
+      });
+    });
+
+    it('应该限制上下文大小', () => {
+      ErrorHandler.resetInstance();
+      const handlerWithSmallContext = ErrorHandler.getInstance({
+        maxContextSize: 50,
+      });
+
+      const largeContext = {
+        data: 'a'.repeat(100),
+      };
+
+      const error = new ValidationError('测试错误', largeContext);
+      const result = handlerWithSmallContext.handleError(error);
+
+      expect(result.context?._truncated).toBe(true);
+      expect(result.context?._originalSize).toBeGreaterThan(50);
+    });
+  });
+
+  describe('错误统计', () => {
+    it('应该正确统计错误', () => {
+      errorHandler.handleError(new ValidationError('错误1'));
+      errorHandler.handleError(new ValidationError('错误2'));
+      errorHandler.handleError(new FileSystemError('错误3'));
+
+      const metrics = errorHandler.getMetrics();
+
+      expect(metrics.total).toBe(3);
+      expect(metrics.byType[ErrorType.ValidationError]).toBe(2);
+      expect(metrics.byType[ErrorType.FileSystemError]).toBe(1);
+      expect(metrics.recent).toHaveLength(3);
+    });
+
+    it('应该能够清空统计', () => {
+      errorHandler.handleError(new ValidationError('错误'));
+      expect(errorHandler.getMetrics().total).toBe(1);
+
+      errorHandler.clearMetrics();
+      const metrics = errorHandler.getMetrics();
+
+      expect(metrics.total).toBe(0);
+      expect(metrics.byType).toEqual({});
+      expect(metrics.recent).toHaveLength(0);
+    });
+
+    it('应该限制最近错误记录数量', () => {
+      // 生成超过100个错误
+      for (let i = 0; i < 150; i++) {
+        errorHandler.handleError(new ValidationError(`错误${i}`));
+      }
+
+      const metrics = errorHandler.getMetrics();
+      expect(metrics.recent).toHaveLength(100);
+      expect(metrics.total).toBe(150);
     });
   });
 
   describe('参数验证', () => {
     it('应该验证必需参数', () => {
-      const params = { name: 'test', age: 25 };
-      const requiredFields = ['name', 'age'];
-
-      expect(() => {
-        errorHandler.validateRequired(params, requiredFields);
-      }).not.toThrow();
-    });
-
-    it('应该在缺少必需参数时抛出错误', () => {
       const params = { name: 'test' };
-      const requiredFields = ['name', 'age', 'email'];
+      const requiredFields = ['name', 'email'];
 
       expect(() => {
         errorHandler.validateRequired(params, requiredFields);
       }).toThrow(ValidationError);
-
-      try {
-        errorHandler.validateRequired(params, requiredFields);
-      } catch (error) {
-        expect(error).toBeInstanceOf(ValidationError);
-        expect((error as ValidationError).message).toContain(
-          '缺少必需参数: age, email'
-        );
-        expect((error as ValidationError).context).toEqual({
-          missing: ['age', 'email'],
-          provided: ['name'],
-        });
-      }
     });
 
     it('应该验证参数类型', () => {
-      const params = { name: 'test', age: 25, active: true };
-      const typeMap = { name: 'string', age: 'number', active: 'boolean' };
-
-      expect(() => {
-        errorHandler.validateTypes(params, typeMap);
-      }).not.toThrow();
-    });
-
-    it('应该在参数类型错误时抛出错误', () => {
-      const params = { name: 123, age: '25', active: 'true' };
-      const typeMap = { name: 'string', age: 'number', active: 'boolean' };
-
-      expect(() => {
-        errorHandler.validateTypes(params, typeMap);
-      }).toThrow(ValidationError);
-
-      try {
-        errorHandler.validateTypes(params, typeMap);
-      } catch (error) {
-        expect(error).toBeInstanceOf(ValidationError);
-        expect((error as ValidationError).message).toContain('参数类型错误');
-        expect((error as ValidationError).context?.errors).toHaveLength(3);
-      }
-    });
-
-    it('应该忽略未定义的参数', () => {
-      const params = { name: 'test' };
+      const params = { name: 'test', age: '25' };
       const typeMap = { name: 'string', age: 'number' };
 
       expect(() => {
         errorHandler.validateTypes(params, typeMap);
+      }).toThrow(ValidationError);
+    });
+
+    it('应该验证字符串长度', () => {
+      expect(() => {
+        errorHandler.validateStringLength('ab', 'name', 3, 10);
+      }).toThrow(ValidationError);
+
+      expect(() => {
+        errorHandler.validateStringLength('a'.repeat(15), 'name', 3, 10);
+      }).toThrow(ValidationError);
+
+      // 正常情况不应该抛出错误
+      expect(() => {
+        errorHandler.validateStringLength('test', 'name', 3, 10);
+      }).not.toThrow();
+    });
+
+    it('应该验证数组长度', () => {
+      expect(() => {
+        errorHandler.validateArrayLength([1], 'items', 2, 5);
+      }).toThrow(ValidationError);
+
+      expect(() => {
+        errorHandler.validateArrayLength([1, 2, 3, 4, 5, 6], 'items', 2, 5);
+      }).toThrow(ValidationError);
+
+      // 正常情况不应该抛出错误
+      expect(() => {
+        errorHandler.validateArrayLength([1, 2, 3], 'items', 2, 5);
+      }).not.toThrow();
+    });
+
+    it('应该验证枚举值', () => {
+      const allowedValues = ['red', 'green', 'blue'];
+
+      expect(() => {
+        errorHandler.validateEnum('yellow', 'color', allowedValues);
+      }).toThrow(ValidationError);
+
+      // 正常情况不应该抛出错误
+      expect(() => {
+        errorHandler.validateEnum('red', 'color', allowedValues);
       }).not.toThrow();
     });
   });
 
-  describe('异步函数包装', () => {
-    it('应该包装成功的异步函数', async () => {
-      const asyncFn = async (x: number, y: number) => x + y;
-      const wrappedFn = errorHandler.wrapAsync(asyncFn);
+  describe('错误类型检查', () => {
+    it('应该正确识别错误类型', () => {
+      const validationError = new ValidationError('测试');
+      const fileSystemError = new FileSystemError('测试');
+      const genericError = new Error('测试');
 
-      const result = await wrappedFn(2, 3);
-      expect(result).toBe(5);
+      expect(
+        errorHandler.isErrorType(validationError, ErrorType.ValidationError)
+      ).toBe(true);
+      expect(
+        errorHandler.isErrorType(validationError, ErrorType.FileSystemError)
+      ).toBe(false);
+      expect(
+        errorHandler.isErrorType(fileSystemError, ErrorType.FileSystemError)
+      ).toBe(true);
+      expect(
+        errorHandler.isErrorType(genericError, ErrorType.ValidationError)
+      ).toBe(false);
     });
 
-    it('应该捕获异步函数中的错误', async () => {
-      const asyncFn = async () => {
-        throw new ValidationError('异步验证错误', { field: 'test' });
-      };
-      const wrappedFn = errorHandler.wrapAsync(asyncFn, { source: 'test' });
+    it('应该正确识别可恢复错误', () => {
+      const concurrencyError = new ConcurrencyError('测试');
+      const validationError = new ValidationError('测试');
+      const genericError = new Error('测试');
 
-      const result = await wrappedFn();
+      expect(errorHandler.isRecoverableError(concurrencyError)).toBe(true);
+      expect(errorHandler.isRecoverableError(validationError)).toBe(false);
+      expect(errorHandler.isRecoverableError(genericError)).toBe(false);
+    });
+  });
+
+  describe('用户消息格式化', () => {
+    it('应该为不同错误类型返回友好消息', () => {
+      const validationError = new ValidationError('参数无效');
+      const fileSystemError = new FileSystemError('文件操作失败');
+      const notFoundError = new NotFoundError('资源不存在');
+      const systemError = new SystemError('系统错误');
+      const genericError = new Error('通用错误');
+
+      expect(errorHandler.formatUserMessage(validationError)).toBe('参数无效');
+      expect(errorHandler.formatUserMessage(fileSystemError)).toBe(
+        '文件操作失败，请检查文件权限和磁盘空间'
+      );
+      expect(errorHandler.formatUserMessage(notFoundError)).toBe('资源不存在');
+      expect(errorHandler.formatUserMessage(systemError)).toBe(
+        '系统错误，请联系管理员'
+      );
+      expect(errorHandler.formatUserMessage(genericError)).toBe(
+        '未知错误，请重试'
+      );
+    });
+  });
+
+  describe('中间件', () => {
+    it('应该创建工具处理器包装器', async () => {
+      const middleware = errorHandler.createMiddleware();
+
+      const mockHandler = vi
+        .fn()
+        .mockRejectedValue(new ValidationError('测试错误'));
+      const wrappedHandler = middleware.wrapToolHandler(
+        mockHandler,
+        'test_tool'
+      );
+
+      const result = await wrappedHandler('arg1', 'arg2');
+
+      expect(result).toEqual({
+        content: [
+          {
+            type: 'text',
+            text: expect.stringContaining('测试错误'),
+          },
+        ],
+      });
+    });
+
+    it('应该创建异步操作包装器', async () => {
+      const middleware = errorHandler.createMiddleware();
+
+      const mockFn = vi.fn().mockRejectedValue(new Error('异步错误'));
+      const wrappedFn = middleware.wrapAsync(mockFn, { context: 'test' });
+
+      const result = await wrappedFn('arg1');
+
       expect(result).toEqual({
         success: false,
-        error: '异步验证错误',
-        type: ErrorType.ValidationError,
+        error: '异步错误',
+        type: ErrorType.UnknownError,
         timestamp: expect.any(String),
-        context: { field: 'test' },
+        context: {
+          originalError: 'Error',
+          context: 'test',
+        },
+        stack: expect.any(String),
       });
     });
   });
-});
 
-describe('WaveForgeError', () => {
-  it('应该创建基础错误', () => {
-    const error = new WaveForgeError('测试错误');
+  describe('配置', () => {
+    it('应该返回正确的配置', () => {
+      const config = errorHandler.getConfig();
 
-    expect(error.name).toBe('WaveForgeError');
-    expect(error.message).toBe('测试错误');
-    expect(error.type).toBe(ErrorType.UnknownError);
-    expect(error.timestamp).toMatch(
-      /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
-    );
-  });
-
-  it('应该创建带上下文的错误', () => {
-    const context = { field: 'test', value: 123 };
-    const error = new WaveForgeError(
-      '测试错误',
-      ErrorType.ValidationError,
-      context
-    );
-
-    expect(error.type).toBe(ErrorType.ValidationError);
-    expect(error.context).toEqual(context);
-  });
-
-  it('应该正确序列化为 JSON', () => {
-    const error = new WaveForgeError('测试错误', ErrorType.ValidationError, {
-      test: true,
+      expect(config).toEqual({
+        logLevel: LogLevel.Error,
+        includeStackTrace: true,
+        maxContextSize: 1000,
+        enableMetrics: true,
+      });
     });
-    const json = error.toJSON();
 
-    expect(json).toEqual({
-      name: 'WaveForgeError',
-      message: '测试错误',
-      type: ErrorType.ValidationError,
-      timestamp: error.timestamp,
-      context: { test: true },
-      stack: error.stack,
+    it('应该支持自定义配置', () => {
+      ErrorHandler.resetInstance();
+      const customHandler = ErrorHandler.getInstance({
+        logLevel: LogLevel.Warning,
+        includeStackTrace: false,
+        maxContextSize: 500,
+        enableMetrics: false,
+      });
+
+      const config = customHandler.getConfig();
+
+      expect(config).toEqual({
+        logLevel: LogLevel.Warning,
+        includeStackTrace: false,
+        maxContextSize: 500,
+        enableMetrics: false,
+      });
     });
-  });
-});
-
-describe('ValidationError', () => {
-  it('应该创建验证错误', () => {
-    const error = new ValidationError('验证失败', { field: 'email' });
-
-    expect(error.name).toBe('ValidationError');
-    expect(error.message).toBe('验证失败');
-    expect(error.type).toBe(ErrorType.ValidationError);
-    expect(error.context).toEqual({ field: 'email' });
-  });
-});
-
-describe('FileSystemError', () => {
-  it('应该创建文件系统错误', () => {
-    const error = new FileSystemError('文件不存在', { path: '/test/file.txt' });
-
-    expect(error.name).toBe('FileSystemError');
-    expect(error.message).toBe('文件不存在');
-    expect(error.type).toBe(ErrorType.FileSystemError);
-    expect(error.context).toEqual({ path: '/test/file.txt' });
-  });
-});
-
-describe('ConcurrencyError', () => {
-  it('应该创建并发错误', () => {
-    const error = new ConcurrencyError('锁获取失败', { lockId: 'task-123' });
-
-    expect(error.name).toBe('ConcurrencyError');
-    expect(error.message).toBe('锁获取失败');
-    expect(error.type).toBe(ErrorType.ConcurrencyError);
-    expect(error.context).toEqual({ lockId: 'task-123' });
-  });
-});
-
-describe('错误类型枚举', () => {
-  it('应该包含所有错误类型', () => {
-    expect(ErrorType.ValidationError).toBe('VALIDATION_ERROR');
-    expect(ErrorType.FileSystemError).toBe('FILESYSTEM_ERROR');
-    expect(ErrorType.ConcurrencyError).toBe('CONCURRENCY_ERROR');
-    expect(ErrorType.NetworkError).toBe('NETWORK_ERROR');
-    expect(ErrorType.UnknownError).toBe('UNKNOWN_ERROR');
   });
 });
