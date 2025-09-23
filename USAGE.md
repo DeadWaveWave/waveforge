@@ -272,7 +272,7 @@ Update the status of a plan or step.
 
 ### current_task_modify
 
-Modify task structure including plans, steps, and goals.
+Modify task structure including plans, steps, and goals, including the powerful three-level hint system.
 
 **Schema:**
 
@@ -316,6 +316,10 @@ Modify task structure including plans, steps, and goals.
       "plan_id": {
         "type": "string",
         "description": "针对特定计划修改时需要的计划ID"
+      },
+      "step_id": {
+        "type": "string",
+        "description": "针对特定步骤修改时需要的步骤ID（修改步骤级提示时必须同时提供plan_id）"
       }
     },
     "required": ["field", "content", "reason", "change_type"],
@@ -323,6 +327,44 @@ Modify task structure including plans, steps, and goals.
   }
 }
 ```
+
+**Hint System Examples:**
+
+```bash
+# Add task-level hints (applies to all operations)
+{
+  "field": "hints",
+  "content": ["注意代码质量", "遵循安全规范", "及时更新文档"],
+  "reason": "添加任务级开发指导",
+  "change_type": "user_request"
+}
+
+# Add plan-level hints (applies to specific plan operations)
+{
+  "field": "hints",
+  "content": ["注意设计模式", "考虑扩展性"],
+  "reason": "添加设计阶段提示",
+  "change_type": "user_request",
+  "plan_id": "plan-001"
+}
+
+# Add step-level hints (applies to specific step operations)
+{
+  "field": "hints",
+  "content": ["仔细分析需求", "与用户确认细节"],
+  "reason": "添加需求分析提示",
+  "change_type": "user_request",
+  "plan_id": "plan-001",
+  "step_id": "step-001"
+}
+```
+
+**How Hints Work:**
+
+- **Task-level hints**: Always returned in `current_task_update` responses
+- **Plan-level hints**: Returned when updating plans or steps within that plan
+- **Step-level hints**: Returned when updating that specific step
+- **Multi-Agent Collaboration**: Different agents can add hints at different levels, and executing agents receive all relevant hints based on their current operation context
 
 ### current_task_complete
 

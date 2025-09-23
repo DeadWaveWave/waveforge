@@ -26,6 +26,7 @@ WaveForge MCP task management system is now largely complete! Core project manag
 
 - **Intelligent Task System**
   - **Two-Level Task Model**: Easily manage complex tasks with a structure of "Overall Plans" and "Specific Steps." Get a high-level overview while focusing on the immediate task, unifying macro and micro perspectives.
+  - **Three-Level Hint System**: Provide contextual guidance to AI agents at task, plan, and step levels. Hints are automatically delivered based on the current operation context, enabling seamless multi-agent collaboration and real-time guidance.
   - **Automation-Driven Workflow**: When the last step of a plan is completed, the system automatically completes the plan and prompts the AI to generate steps for the next one. This "relay race" style of automation makes task progression seamless.
 - **Seamless Multi-Agent & Cross-Tool Collaboration**
   - **Unique Project Identifier**: A revolutionary project-binding mechanism eliminates dependency on the current working directory (CWD) or editor workspace. No matter which tool (Cursor, VSCode, Kiro) or terminal you're in, all agents are guaranteed to collaborate within the same project context.

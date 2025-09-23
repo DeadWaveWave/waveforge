@@ -982,11 +982,13 @@ export class TaskManager {
       step: [] as string[],
     };
 
+    let targetPlan: TaskPlan | undefined;
+
     // 获取计划级提示
     if (params.plan_id) {
-      const plan = task.overall_plan.find((p) => p.id === params.plan_id);
-      if (plan) {
-        hints.plan = plan.hints || [];
+      targetPlan = task.overall_plan.find((p) => p.id === params.plan_id);
+      if (targetPlan) {
+        hints.plan = targetPlan.hints || [];
       }
     }
 
@@ -996,6 +998,11 @@ export class TaskManager {
         const step = plan.steps.find((s) => s.id === params.step_id);
         if (step) {
           hints.step = step.hints || [];
+          // 如果没有明确的 plan_id，从步骤所属的计划获取计划级提示
+          if (!targetPlan) {
+            targetPlan = plan;
+            hints.plan = plan.hints || [];
+          }
           break;
         }
       }
