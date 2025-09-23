@@ -200,8 +200,12 @@ export class TaskManager {
       let planRequired = false;
 
       if (params.overall_plan && params.overall_plan.length > 0) {
-        for (const planDescription of params.overall_plan) {
-          const plan = this.createTaskPlan(planDescription, timestamp);
+        for (let i = 0; i < params.overall_plan.length; i++) {
+          const plan = this.createTaskPlan(
+            params.overall_plan[i],
+            timestamp,
+            i
+          );
           overallPlan.push(plan);
         }
         currentPlanId = overallPlan[0].id;
@@ -597,9 +601,13 @@ export class TaskManager {
     return { url: story };
   }
 
-  private createTaskPlan(description: string, timestamp: string): TaskPlan {
+  private createTaskPlan(
+    description: string,
+    timestamp: string,
+    index?: number
+  ): TaskPlan {
     return {
-      id: `plan-${ulid()}`,
+      id: index !== undefined ? `plan-${index + 1}` : `plan-${ulid()}`,
       description: description.trim(),
       status: TaskStatus.ToDo,
       hints: [],
@@ -1140,8 +1148,8 @@ export class TaskManager {
     const oldPlanCount = task.overall_plan.length;
     const newPlanDescriptions = params.content as string[];
 
-    task.overall_plan = newPlanDescriptions.map((description) =>
-      this.createTaskPlan(description, timestamp)
+    task.overall_plan = newPlanDescriptions.map((description, index) =>
+      this.createTaskPlan(description, timestamp, index)
     );
 
     task.current_plan_id =
@@ -1187,8 +1195,8 @@ export class TaskManager {
     const oldStepCount = plan.steps.length;
     const newStepDescriptions = params.content as string[];
 
-    plan.steps = newStepDescriptions.map((description) => ({
-      id: `step-${ulid()}`,
+    plan.steps = newStepDescriptions.map((description, index) => ({
+      id: `step-${index + 1}`,
       description: description.trim(),
       status: TaskStatus.ToDo,
       hints: [],

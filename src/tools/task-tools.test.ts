@@ -221,7 +221,7 @@ describe('CurrentTaskInitTool', () => {
       expect(task!.overall_plan).toHaveLength(4);
 
       task!.overall_plan.forEach((plan, index) => {
-        expect(plan.id).toMatch(/^plan-[0-9A-HJKMNP-TV-Z]{26}$/); // ULID格式
+        expect(plan.id).toMatch(/^plan-\d+$/); // 可读格式
         expect(plan.description).toBe(params.overall_plan![index]);
         expect(plan.status).toBe(TaskStatus.ToDo);
         expect(plan.steps).toHaveLength(0); // 初始时没有步骤

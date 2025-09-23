@@ -482,7 +482,8 @@ export class CurrentTaskReadTool extends BaseTaskTool {
 
     lines.push('', '## 执行日志');
     task.logs.slice(-5).forEach((log: any) => {
-      lines.push(`- **${log.timestamp}**: ${log.message}`);
+      const localTime = new Date(log.timestamp).toLocaleString();
+      lines.push(`- **${localTime}**: ${log.message}`);
     });
 
     return lines.join('\n');
