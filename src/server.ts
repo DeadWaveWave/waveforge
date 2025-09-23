@@ -31,6 +31,7 @@ import { TaskManager } from './core/task-manager.js';
 // import { ProjectBindTool, ProjectInfoTool } from './tools/project-tools.js';
 import { ulid } from 'ulid';
 import * as path from 'path';
+import { PathValidator } from './core/path-validator.js';
 
 /**
  * WaveForge MCP 服务器类
@@ -290,13 +291,13 @@ class WaveForgeServer {
    * 注册项目管理工具
    */
   private registerProjectManagementTools(): void {
-    // 注册项目连接工具（避免 project_bind 名称问题）
+    // 注册项目连接工具（集成路径验证和安全检查）
     toolRegistry.registerTool({
       name: 'connect_project',
       handler: {
         getDefinition: () => ({
           name: 'connect_project',
-          description: '连接项目到当前会话',
+          description: '连接项目到当前会话，包含路径验证和安全检查',
           inputSchema: {
             type: 'object' as const,
             properties: {
@@ -305,48 +306,109 @@ class WaveForgeServer {
                 description: '项目路径',
               },
             },
+            required: ['project_path'],
             additionalProperties: false,
           },
         }),
         handle: async (args: any) => {
-          // 直接在项目管理器中创建活跃绑定，跳过复杂的文件系统操作
-          const projectPath = args?.project_path || process.cwd();
-          const projectId = `project-${Date.now()}`;
+          try {
+            const projectPath = args?.project_path;
 
-          // 手动创建活跃绑定
-          (this.projectManager as any).activeBinding = {
-            project_id: projectId,
-            root: projectPath,
-            slug: 'waveforge',
-            origin: undefined,
-            bound_at: new Date().toISOString(),
-          };
+            if (!projectPath) {
+              throw new Error('project_path 参数是必需的');
+            }
 
-          const response = {
-            success: true,
-            message: '项目连接成功',
-            data: {
-              project: {
-                id: projectId,
-                root: projectPath,
-                slug: 'waveforge',
-                origin: undefined,
+            // 使用 PathValidator 进行安全检查
+            const pathValidator = new PathValidator();
+            const validationResult =
+              await pathValidator.validatePath(projectPath);
+
+            if (!validationResult.valid) {
+              const errorResponse = {
+                success: false,
+                error: `路径验证失败: ${validationResult.errors.join(', ')}`,
+                message: '项目连接失败',
+                details: {
+                  path: projectPath,
+                  normalizedPath: validationResult.normalizedPath,
+                  errors: validationResult.errors,
+                  warnings: validationResult.warnings,
+                  securityRisk: validationResult.securityRisk,
+                },
+              };
+
+              return {
+                content: [
+                  {
+                    type: 'text' as const,
+                    text: JSON.stringify(errorResponse, null, 2),
+                  },
+                ],
+              };
+            }
+
+            // 路径验证通过，使用规范化后的路径
+            const normalizedPath = validationResult.normalizedPath!;
+            const projectId = `project-${Date.now()}`;
+
+            // 创建活跃绑定
+            (this.projectManager as any).activeBinding = {
+              project_id: projectId,
+              root: normalizedPath,
+              slug: path.basename(normalizedPath),
+              origin: undefined,
+              bound_at: new Date().toISOString(),
+            };
+
+            const response = {
+              success: true,
+              message: '项目连接成功',
+              data: {
+                project: {
+                  id: projectId,
+                  root: normalizedPath,
+                  slug: path.basename(normalizedPath),
+                  origin: undefined,
+                },
+                validation: {
+                  originalPath: projectPath,
+                  normalizedPath: normalizedPath,
+                  warnings: validationResult.warnings,
+                  permissions: validationResult.permissions,
+                  isSymlink: validationResult.isSymlink,
+                  symlinkTarget: validationResult.symlinkTarget,
+                },
               },
-            },
-          };
+            };
 
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: JSON.stringify(response, null, 2),
-              },
-            ],
-          };
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: JSON.stringify(response, null, 2),
+                },
+              ],
+            };
+          } catch (error) {
+            const errorResponse = {
+              success: false,
+              error: error instanceof Error ? error.message : String(error),
+              message: '项目连接失败',
+            };
+
+            return {
+              content: [
+                {
+                  type: 'text' as const,
+                  text: JSON.stringify(errorResponse, null, 2),
+                },
+              ],
+            };
+          }
         },
       },
       category: 'project',
-      description: '连接项目到当前会话',
+      description: '安全地连接项目到当前会话',
       enabled: true,
     });
 
