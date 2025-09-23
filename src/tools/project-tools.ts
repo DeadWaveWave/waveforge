@@ -58,21 +58,13 @@ export class ProjectBindTool {
       // 验证参数
       this.validateParams(params);
 
-      // 简化实现：直接返回成功响应，不进行实际的文件系统操作
-      const projectPath = params.project_path || process.cwd();
-      const projectId = `project-${Date.now()}`;
+      // 调用项目管理器进行实际绑定
+      const result = await this.projectManager.bindProject(params);
 
       const response = {
         success: true,
-        message: '项目绑定成功（简化模式）',
-        data: {
-          project: {
-            id: projectId,
-            root: projectPath,
-            slug: 'waveforge',
-            origin: undefined,
-          },
-        },
+        message: '项目绑定成功',
+        data: result,
       };
 
       return {

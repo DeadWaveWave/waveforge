@@ -48,20 +48,27 @@ describe('项目工具集成测试', () => {
       const response = JSON.parse(result.content[0].text);
       expect(response.success).toBe(true);
       expect(response.data.project.root).toBe(path.resolve(testProjectDir));
-      expect(response.data.project.slug).toBe('waveforge'); // 简化实现固定返回 'waveforge'
+      expect(response.data.project.slug).toBe('test-project'); // 实际实现根据目录名生成slug
       expect(response.data.project.id).toBeTruthy();
     });
 
     it('应该能够通过项目ID绑定项目', async () => {
-      // 简化实现：每次调用都生成新的项目ID，所以我们只验证基本功能
+      // 先通过路径绑定项目以创建项目记录
+      const bindResult = await bindTool.handle({
+        project_path: testProjectDir,
+      });
+      const bindResponse = JSON.parse(bindResult.content[0].text);
+      const projectId = bindResponse.data.project.id;
+
+      // 然后通过项目ID重新绑定
       const result = await bindTool.handle({
-        project_id: 'test-project-id',
+        project_id: projectId,
       });
 
       const response = JSON.parse(result.content[0].text);
       expect(response.success).toBe(true);
-      expect(response.data.project.id).toBeTruthy(); // 简化实现会生成新ID
-      expect(response.data.project.slug).toBe('waveforge');
+      expect(response.data.project.id).toBe(projectId);
+      expect(response.data.project.slug).toBe('test-project');
     });
 
     it('应该正确处理无效的项目路径', async () => {
@@ -72,8 +79,8 @@ describe('项目工具集成测试', () => {
       });
 
       const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true); // 简化实现总是成功
-      expect(response.data.project.root).toBe(invalidPath);
+      expect(response.success).toBe(false); // 完整实现会验证路径
+      expect(response.error).toContain('路径不存在');
     });
 
     it('应该正确处理无效的项目ID', async () => {
@@ -82,8 +89,8 @@ describe('项目工具集成测试', () => {
       });
 
       const response = JSON.parse(result.content[0].text);
-      expect(response.success).toBe(true); // 简化实现总是成功
-      expect(response.data.project.id).toBeTruthy();
+      expect(response.success).toBe(false); // 完整实现会验证项目ID
+      expect(response.error).toContain('不存在或已失效');
     });
 
     it('应该验证参数完整性', async () => {
@@ -99,16 +106,42 @@ describe('项目工具集成测试', () => {
   });
 
   describe('project_info 工具', () => {
-    it.skip('应该能够获取活跃项目信息', async () => {
-      // 跳过此测试，因为简化实现不支持状态管理
+    it('应该能够获取活跃项目信息', async () => {
+      // 先绑定项目
+      await bindTool.handle({
+        project_path: testProjectDir,
+      });
+
+      // 获取项目信息
+      const result = await infoTool.handle();
+
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.success).toBe(true);
+      expect(response.data.project.root).toBe(path.resolve(testProjectDir));
+      expect(response.data.project.id).toBeTruthy();
+      expect(response.data.project.slug).toBe('test-project');
     });
 
-    it.skip('应该正确处理没有活跃项目的情况', async () => {
-      // 跳过此测试，因为简化实现不支持状态管理
+    it('应该正确处理没有活跃项目的情况', async () => {
+      // 清除项目绑定
+      projectManager.clearBinding();
+
+      // 尝试获取项目信息
+      const result = await infoTool.handle();
+
+      expect(result.content).toHaveLength(1);
+      expect(result.content[0].type).toBe('text');
+
+      const response = JSON.parse(result.content[0].text);
+      expect(response.success).toBe(false);
+      expect(response.error).toContain('NO_ACTIVE_PROJECT');
     });
   });
 
-  describe.skip('工具集成测试', () => {
+  describe('工具集成测试', () => {
     it('应该支持完整的项目管理工作流', async () => {
       // 1. 绑定项目
       const bindResult = await bindTool.handle({
@@ -201,7 +234,7 @@ describe('项目工具集成测试', () => {
     });
   });
 
-  describe.skip('错误处理和边界情况', () => {
+  describe('错误处理和边界情况', () => {
     it('应该正确处理文件权限问题', async () => {
       // 创建一个只读目录（在支持的系统上）
       const readOnlyDir = path.join(tempDir, 'readonly');

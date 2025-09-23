@@ -245,6 +245,153 @@ export interface TaskLog {
 }
 
 /**
+ * 跨进程任务操作接口
+ * 用于记录和跟踪跨进程的任务操作
+ */
+export interface TaskOperation {
+  /** 操作类型 */
+  type: 'init' | 'update' | 'modify' | 'complete' | 'read' | 'log';
+  /** 代理标识 */
+  agentId: string;
+  /** 进程标识（工具名称+PID） */
+  processId: string;
+  /** 工具名称（kiro/cursor/codex等） */
+  toolName: string;
+  /** 操作时间戳 */
+  timestamp: string;
+  /** 操作参数 */
+  params: any;
+}
+
+/**
+ * 文件锁接口
+ * 用于跨进程文件锁管理
+ */
+export interface FileLock {
+  /** 锁文件路径 */
+  lockPath: string;
+  /** 进程标识 */
+  processId: string;
+  /** 锁创建时间戳 */
+  timestamp: string;
+  /** 关联的任务ID */
+  taskId: string;
+  /** 锁超时时间（毫秒） */
+  timeout?: number;
+  /** 锁类型（读锁/写锁） */
+  type?: 'read' | 'write';
+}
+
+/**
+ * 任务状态接口
+ * 用于状态版本管理和一致性检查
+ */
+export interface TaskState {
+  /** 状态版本号 */
+  version: number;
+  /** 最后修改时间 */
+  lastModified: string;
+  /** 修改者（进程ID） */
+  modifiedBy: string;
+  /** 数据校验和 */
+  checksum: string;
+  /** 锁状态 */
+  locked: boolean;
+  /** 锁持有者 */
+  lockHolder?: string;
+}
+
+/**
+ * 冲突信息接口
+ * 用于描述跨进程操作冲突
+ */
+export interface ConflictInfo {
+  /** 冲突类型 */
+  type:
+    | 'concurrent_update'
+    | 'state_mismatch'
+    | 'hint_collision'
+    | 'version_conflict'
+    | 'lock_timeout';
+  /** 冲突的操作列表 */
+  operations: TaskOperation[];
+  /** 解决方案 */
+  resolution: 'merge' | 'reject' | 'queue' | 'retry';
+  /** 冲突的进程列表 */
+  conflictingProcesses: string[];
+  /** 冲突详情 */
+  details?: Record<string, any>;
+}
+
+/**
+ * 提示集合接口
+ * 用于管理不同层级的提示信息
+ */
+export interface HintCollection {
+  /** 任务级提示 */
+  task: string[];
+  /** 计划级提示 */
+  plan: string[];
+  /** 步骤级提示 */
+  step: string[];
+}
+
+/**
+ * 任务上下文接口
+ * 用于提供操作上下文信息
+ */
+export interface TaskContext {
+  /** 当前计划ID */
+  currentPlanId?: string;
+  /** 当前步骤ID */
+  currentStepId?: string;
+  /** 操作类型 */
+  operationType: string;
+  /** 进程ID */
+  processId: string;
+  /** 期望的状态版本 */
+  expectedVersion?: number;
+}
+
+/**
+ * 文件锁获取选项接口
+ */
+export interface LockAcquisitionOptions {
+  /** 超时时间（毫秒），默认30秒 */
+  timeout?: number;
+  /** 重试间隔（毫秒），默认100毫秒 */
+  retryInterval?: number;
+  /** 最大重试次数，默认300次 */
+  maxRetries?: number;
+  /** 锁类型，默认写锁 */
+  lockType?: 'read' | 'write';
+  /** 是否强制获取锁（清理过期锁） */
+  force?: boolean;
+  /** 取消信号 */
+  signal?: AbortSignal;
+  /** 当前持有的锁（用于死锁预防） */
+  currentHeldLocks?: string[];
+}
+
+/**
+ * 原子操作结果接口
+ */
+export interface AtomicOperationResult<T = any> {
+  /** 操作是否成功 */
+  success: boolean;
+  /** 操作结果数据 */
+  data?: T;
+  /** 新的状态版本 */
+  version?: number;
+  /** 错误信息 */
+  error?: string;
+  /** 是否发生了冲突 */
+  conflict?: boolean;
+  /** 冲突详情 */
+  conflictInfo?: ConflictInfo;
+}
+
+/**
  * 当前任务接口
  * 表示完整的任务信息，包含计划、步骤、日志等所有相关数据
  */
