@@ -73,7 +73,7 @@ export class ProjectRegistry {
 
   /**
    * 确保指定路径存在项目信息
-   * 如果不存在则生成新的项目身份信息
+   * 如果不存在或损坏则生成新的项目身份信息
    */
   async ensureAtPath(dir: string): Promise<ProjectInfo> {
     try {
@@ -83,7 +83,7 @@ export class ProjectRegistry {
         return existingProject;
       }
 
-      // 生成新的项目信息
+      // 项目信息不存在或加载失败，生成新的项目信息
       const projectInfo = await this.generateProjectInfo(dir);
 
       // 保存到本地文件
@@ -97,6 +97,67 @@ export class ProjectRegistry {
 
       return projectInfo;
     } catch (error) {
+      // 如果是项目信息文件损坏，尝试修复
+      if (
+        error instanceof Error &&
+        error.message.includes('加载项目信息失败')
+      ) {
+        logger.warning(
+          LogCategory.Task,
+          LogAction.Handle,
+          '检测到损坏的项目信息文件，尝试修复',
+          {
+            dir,
+            error: error.message,
+          }
+        );
+
+        try {
+          // 删除损坏的项目信息文件
+          const projectFilePath = path.join(
+            dir,
+            '.wave',
+            ProjectRegistry.PROJECT_FILE
+          );
+          if (await fs.pathExists(projectFilePath)) {
+            await fs.remove(projectFilePath);
+            logger.info(
+              LogCategory.Task,
+              LogAction.Update,
+              '已删除损坏的项目信息文件',
+              {
+                path: projectFilePath,
+              }
+            );
+          }
+
+          // 重新生成项目信息
+          const projectInfo = await this.generateProjectInfo(dir);
+          await this.saveProjectInfo(dir, projectInfo);
+
+          logger.info(LogCategory.Task, LogAction.Create, '项目信息修复成功', {
+            dir,
+            projectId: projectInfo.id,
+            slug: projectInfo.slug,
+          });
+
+          return projectInfo;
+        } catch (repairError) {
+          logger.error(LogCategory.Task, LogAction.Handle, '项目信息修复失败', {
+            dir,
+            originalError: error.message,
+            repairError:
+              repairError instanceof Error
+                ? repairError.message
+                : String(repairError),
+          });
+
+          throw new Error(
+            `项目信息修复失败: ${repairError instanceof Error ? repairError.message : String(repairError)}`
+          );
+        }
+      }
+
       logger.error(LogCategory.Task, LogAction.Create, '项目信息确保失败', {
         dir,
         error: error instanceof Error ? error.message : String(error),

@@ -14,7 +14,11 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { errorHandler, ValidationError } from './core/error-handler.js';
 import { logger } from './core/logger.js';
-import { LogCategory, LogAction } from './types/index.js';
+import {
+  LogCategory,
+  LogAction,
+  type ProjectBindParams,
+} from './types/index.js';
 import { HealthTool, PingTool } from './tools/index.js';
 import {
   CurrentTaskInitTool,
@@ -28,10 +32,9 @@ import { ProjectRootManager } from './core/project-root-manager.js';
 import { ProjectManager } from './core/project-manager.js';
 import { toolRegistry } from './core/tool-registry.js';
 import { TaskManager } from './core/task-manager.js';
-// import { ProjectBindTool, ProjectInfoTool } from './tools/project-tools.js';
+import { ProjectBindTool, ProjectInfoTool } from './tools/project-tools.js';
 import { ulid } from 'ulid';
 import * as path from 'path';
-import { PathValidator } from './core/path-validator.js';
 
 /**
  * WaveForge MCP 服务器类
@@ -291,13 +294,31 @@ class WaveForgeServer {
    * 注册项目管理工具
    */
   private registerProjectManagementTools(): void {
-    // 注册项目连接工具（集成路径验证和安全检查）
+    // 创建项目管理工具实例
+    const projectBindTool = new ProjectBindTool(this.projectManager);
+    const projectInfoTool = new ProjectInfoTool(this.projectManager);
+
+    // 注册 project_bind 工具（完整实现）
+    toolRegistry.registerTool({
+      name: 'project_bind',
+      handler: {
+        getDefinition: () => ProjectBindTool.getDefinition(),
+        handle: async (args) =>
+          await projectBindTool.handle(args as ProjectBindParams),
+      },
+      category: 'project',
+      description: '绑定项目到当前连接，提供稳定项目标识',
+      enabled: true,
+    });
+
+    // 注册 connect_project 工具（向后兼容的别名）
     toolRegistry.registerTool({
       name: 'connect_project',
       handler: {
         getDefinition: () => ({
           name: 'connect_project',
-          description: '连接项目到当前会话，包含路径验证和安全检查',
+          description:
+            '连接项目到当前会话（project_bind 的别名，保持向后兼容）',
           inputSchema: {
             type: 'object' as const,
             properties: {
@@ -311,171 +332,34 @@ class WaveForgeServer {
           },
         }),
         handle: async (args: any) => {
-          try {
-            const projectPath = args?.project_path;
-
-            if (!projectPath) {
-              throw new Error('project_path 参数是必需的');
-            }
-
-            // 使用 PathValidator 进行安全检查
-            const pathValidator = new PathValidator();
-            const validationResult =
-              await pathValidator.validatePath(projectPath);
-
-            if (!validationResult.valid) {
-              const errorResponse = {
-                success: false,
-                error: `路径验证失败: ${validationResult.errors.join(', ')}`,
-                message: '项目连接失败',
-                details: {
-                  path: projectPath,
-                  normalizedPath: validationResult.normalizedPath,
-                  errors: validationResult.errors,
-                  warnings: validationResult.warnings,
-                  securityRisk: validationResult.securityRisk,
-                },
-              };
-
-              return {
-                content: [
-                  {
-                    type: 'text' as const,
-                    text: JSON.stringify(errorResponse, null, 2),
-                  },
-                ],
-              };
-            }
-
-            // 路径验证通过，使用规范化后的路径
-            const normalizedPath = validationResult.normalizedPath!;
-            const projectId = `project-${Date.now()}`;
-
-            // 创建活跃绑定
-            (this.projectManager as any).activeBinding = {
-              project_id: projectId,
-              root: normalizedPath,
-              slug: path.basename(normalizedPath),
-              origin: undefined,
-              bound_at: new Date().toISOString(),
-            };
-
-            const response = {
-              success: true,
-              message: '项目连接成功',
-              data: {
-                project: {
-                  id: projectId,
-                  root: normalizedPath,
-                  slug: path.basename(normalizedPath),
-                  origin: undefined,
-                },
-                validation: {
-                  originalPath: projectPath,
-                  normalizedPath: normalizedPath,
-                  warnings: validationResult.warnings,
-                  permissions: validationResult.permissions,
-                  isSymlink: validationResult.isSymlink,
-                  symlinkTarget: validationResult.symlinkTarget,
-                },
-              },
-            };
-
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: JSON.stringify(response, null, 2),
-                },
-              ],
-            };
-          } catch (error) {
-            const errorResponse = {
-              success: false,
-              error: error instanceof Error ? error.message : String(error),
-              message: '项目连接失败',
-            };
-
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: JSON.stringify(errorResponse, null, 2),
-                },
-              ],
-            };
-          }
+          // 将 connect_project 的参数转换为 project_bind 的参数格式
+          const projectBindParams: ProjectBindParams = {
+            project_path: args?.project_path,
+          };
+          return await projectBindTool.handle(projectBindParams);
         },
       },
       category: 'project',
-      description: '安全地连接项目到当前会话',
+      description: '连接项目到当前会话（向后兼容）',
       enabled: true,
     });
 
-    // 注册 project_info 工具
+    // 注册 project_info 工具（完整实现）
     toolRegistry.registerTool({
       name: 'project_info',
       handler: {
-        getDefinition: () => ({
-          name: 'project_info',
-          description: '获取当前连接的项目信息',
-          inputSchema: {
-            type: 'object' as const,
-            properties: {},
-            additionalProperties: false,
-          },
-        }),
-        handle: async () => {
-          // 直接从项目管理器获取活跃绑定
-          const activeBinding = (this.projectManager as any).activeBinding;
-
-          if (!activeBinding) {
-            const errorResponse = {
-              success: false,
-              error:
-                'NO_ACTIVE_PROJECT: 当前连接没有绑定活跃项目，请先调用 connect_project',
-              message: '获取项目信息失败',
-            };
-
-            return {
-              content: [
-                {
-                  type: 'text' as const,
-                  text: JSON.stringify(errorResponse, null, 2),
-                },
-              ],
-            };
-          }
-
-          const response = {
-            success: true,
-            message: '获取项目信息成功',
-            data: {
-              project: {
-                id: activeBinding.project_id,
-                root: activeBinding.root,
-                slug: activeBinding.slug,
-                origin: activeBinding.origin,
-              },
-            },
-          };
-
-          return {
-            content: [
-              {
-                type: 'text' as const,
-                text: JSON.stringify(response, null, 2),
-              },
-            ],
-          };
-        },
+        getDefinition: () => ProjectInfoTool.getDefinition(),
+        handle: async () => await projectInfoTool.handle(),
       },
       category: 'project',
-      description: '获取当前连接的项目信息',
+      description: '获取当前连接的活跃项目信息',
       enabled: true,
     });
 
-    // 简化日志输出
+    logger.info(LogCategory.Task, LogAction.Create, '项目管理工具注册完成', {
+      tools: ['project_bind', 'connect_project', 'project_info'],
+      backwardCompatible: true,
+    });
   }
 
   /**
