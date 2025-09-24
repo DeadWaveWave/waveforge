@@ -298,27 +298,13 @@ class WaveForgeServer {
     const projectBindTool = new ProjectBindTool(this.projectManager);
     const projectInfoTool = new ProjectInfoTool(this.projectManager);
 
-    // 注册 project_bind 工具（完整实现）
-    toolRegistry.registerTool({
-      name: 'project_bind',
-      handler: {
-        getDefinition: () => ProjectBindTool.getDefinition(),
-        handle: async (args) =>
-          await projectBindTool.handle(args as ProjectBindParams),
-      },
-      category: 'project',
-      description: '绑定项目到当前连接，提供稳定项目标识',
-      enabled: true,
-    });
-
-    // 注册 connect_project 工具（向后兼容的别名）
+    // 注册 connect_project 工具（主要实现）
     toolRegistry.registerTool({
       name: 'connect_project',
       handler: {
         getDefinition: () => ({
           name: 'connect_project',
-          description:
-            '连接项目到当前会话（project_bind 的别名，保持向后兼容）',
+          description: '连接项目到当前会话，提供稳定项目标识',
           inputSchema: {
             type: 'object' as const,
             properties: {
@@ -332,7 +318,7 @@ class WaveForgeServer {
           },
         }),
         handle: async (args: any) => {
-          // 将 connect_project 的参数转换为 project_bind 的参数格式
+          // 处理 connect_project 参数
           const projectBindParams: ProjectBindParams = {
             project_path: args?.project_path,
           };
@@ -340,7 +326,7 @@ class WaveForgeServer {
         },
       },
       category: 'project',
-      description: '连接项目到当前会话（向后兼容）',
+      description: '连接项目到当前会话，提供稳定项目标识',
       enabled: true,
     });
 
@@ -357,8 +343,8 @@ class WaveForgeServer {
     });
 
     logger.info(LogCategory.Task, LogAction.Create, '项目管理工具注册完成', {
-      tools: ['project_bind', 'connect_project', 'project_info'],
-      backwardCompatible: true,
+      tools: ['connect_project', 'project_info'],
+      primaryTool: 'connect_project',
     });
   }
 
