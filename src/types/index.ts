@@ -392,6 +392,240 @@ export interface AtomicOperationResult<T = any> {
 }
 
 /**
+ * 项目类型枚举
+ * 定义支持的项目类型
+ */
+export enum ProjectType {
+  /** Node.js 项目 */
+  NodeJS = 'nodejs',
+  /** Python 项目 */
+  Python = 'python',
+  /** Rust 项目 */
+  Rust = 'rust',
+  /** Java 项目 */
+  Java = 'java',
+  /** Go 项目 */
+  Go = 'go',
+  /** C/C++ 项目 */
+  CPP = 'cpp',
+  /** C# 项目 */
+  CSharp = 'csharp',
+  /** PHP 项目 */
+  PHP = 'php',
+  /** Ruby 项目 */
+  Ruby = 'ruby',
+  /** Git 仓库 */
+  Git = 'git',
+  /** 通用项目 */
+  Generic = 'generic',
+  /** 未知类型 */
+  Unknown = 'unknown',
+}
+
+/**
+ * 项目类型检测结果接口
+ */
+export interface ProjectTypeDetectionResult {
+  /** 检测到的项目类型 */
+  type: ProjectType;
+  /** 置信度 (0-1) */
+  confidence: number;
+  /** 检测依据的文件列表 */
+  evidenceFiles: string[];
+  /** 检测到的特征 */
+  features: ProjectFeature[];
+  /** 项目根目录路径 */
+  rootPath?: string;
+  /** 检测到的版本信息 */
+  version?: string;
+  /** 项目名称 */
+  name?: string;
+  /** 项目描述 */
+  description?: string;
+}
+
+/**
+ * 项目特征接口
+ */
+export interface ProjectFeature {
+  /** 特征类型 */
+  type:
+    | 'config_file'
+    | 'dependency_file'
+    | 'source_file'
+    | 'build_file'
+    | 'git_repo'
+    | 'directory_structure';
+  /** 特征名称 */
+  name: string;
+  /** 特征文件路径 */
+  path: string;
+  /** 特征权重 */
+  weight: number;
+  /** 特征描述 */
+  description?: string;
+}
+
+/**
+ * 项目根目录检测结果接口
+ */
+export interface ProjectRootDetectionResult {
+  /** 检测到的项目根目录 */
+  rootPath: string;
+  /** 检测方法 */
+  method: 'git_root' | 'config_file' | 'parent_search' | 'current_dir';
+  /** 检测依据的文件 */
+  evidenceFile?: string;
+  /** 置信度 (0-1) */
+  confidence: number;
+  /** 搜索深度 */
+  searchDepth: number;
+}
+
+/**
+ * 项目结构验证结果接口
+ */
+export interface ProjectStructureValidationResult {
+  /** 验证是否通过 */
+  valid: boolean;
+  /** 项目类型 */
+  projectType: ProjectType;
+  /** 验证错误列表 */
+  errors: string[];
+  /** 验证警告列表 */
+  warnings: string[];
+  /** 缺失的必需文件 */
+  missingRequiredFiles: string[];
+  /** 建议的改进 */
+  suggestions: string[];
+  /** 项目健康度评分 (0-100) */
+  healthScore: number;
+}
+
+/**
+ * 项目健康检查结果接口
+ */
+export interface ProjectHealthCheckResult {
+  /** 整体健康状态 */
+  status: 'healthy' | 'warning' | 'error';
+  /** 健康度评分 (0-100) */
+  score: number;
+  /** 检查项目结果 */
+  checks: ProjectHealthCheck[];
+  /** .wave 目录结构状态 */
+  waveStructure: WaveStructureStatus;
+  /** 项目配置状态 */
+  projectConfig: ProjectConfigStatus;
+  /** 建议的修复操作 */
+  recommendations: string[];
+}
+
+/**
+ * 项目健康检查项接口
+ */
+export interface ProjectHealthCheck {
+  /** 检查项名称 */
+  name: string;
+  /** 检查状态 */
+  status: 'pass' | 'warning' | 'fail';
+  /** 检查消息 */
+  message: string;
+  /** 检查详情 */
+  details?: Record<string, any>;
+  /** 修复建议 */
+  suggestion?: string;
+}
+
+/**
+ * .wave 目录结构状态接口
+ */
+export interface WaveStructureStatus {
+  /** 目录是否存在 */
+  exists: boolean;
+  /** 必需的子目录状态 */
+  directories: Record<string, boolean>;
+  /** 必需的文件状态 */
+  files: Record<string, boolean>;
+  /** 权限状态 */
+  permissions: {
+    readable: boolean;
+    writable: boolean;
+  };
+  /** 缺失的项目 */
+  missing: string[];
+  /** 损坏的项目 */
+  corrupted: string[];
+}
+
+/**
+ * 项目配置状态接口
+ */
+export interface ProjectConfigStatus {
+  /** 项目信息文件状态 */
+  projectInfo: {
+    exists: boolean;
+    valid: boolean;
+    error?: string;
+  };
+  /** 全局注册表状态 */
+  globalRegistry: {
+    exists: boolean;
+    valid: boolean;
+    registered: boolean;
+    error?: string;
+  };
+  /** 配置一致性 */
+  consistency: {
+    valid: boolean;
+    issues: string[];
+  };
+}
+
+/**
+ * 项目类型检测器配置接口
+ */
+export interface ProjectTypeDetectorConfig {
+  /** 最大搜索深度 */
+  maxSearchDepth: number;
+  /** 最小置信度阈值 */
+  minConfidenceThreshold: number;
+  /** 是否启用缓存 */
+  enableCache: boolean;
+  /** 缓存过期时间（毫秒） */
+  cacheExpiration: number;
+  /** 自定义检测规则 */
+  customRules?: ProjectDetectionRule[];
+}
+
+/**
+ * 项目检测规则接口
+ */
+export interface ProjectDetectionRule {
+  /** 规则名称 */
+  name: string;
+  /** 项目类型 */
+  projectType: ProjectType;
+  /** 必需文件模式 */
+  requiredFiles: string[];
+  /** 可选文件模式 */
+  optionalFiles?: string[];
+  /** 排除文件模式 */
+  excludeFiles?: string[];
+  /** 目录结构模式 */
+  directoryPatterns?: string[];
+  /** 文件内容模式 */
+  contentPatterns?: Array<{
+    file: string;
+    pattern: RegExp;
+    weight: number;
+  }>;
+  /** 规则权重 */
+  weight: number;
+  /** 最小置信度 */
+  minConfidence: number;
+}
+
+/**
  * 当前任务接口
  * 表示完整的任务信息，包含计划、步骤、日志等所有相关数据
  */
