@@ -51,9 +51,9 @@ We are actively working on implementing the following core features. Feel free t
 ### Core Framework
 
 - [x] **Project Binding & Environment Self-Healing**
-  - [x] `connect_project`: Implement unique binding between a project and the MCP service, eliminating CWD dependency.
-  - [x] `project_info`: Get information about the currently bound project.
-  - [ ] **Initialization & Self-Healing**: Automatically create the `.wave` directory structure, templates, and config files on the first run.
+  - [x] `connect_project`: Implement unique binding between a project and the MCP service, eliminating CWD dependency. Now includes comprehensive security checks and path validation.
+  - [x] `project_info`: Get information about the currently bound project with built-in health monitoring and integrity checks.
+  - [x] **Initialization & Self-Healing**: Automatically create the `.wave` directory structure, templates, and config files on the first run with full data integrity validation.
 
 ### Task Management (MCP Tools)
 
