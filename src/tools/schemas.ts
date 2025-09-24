@@ -463,6 +463,84 @@ export const ProjectInfoSchema = {
 };
 
 /**
+ * Task List 工具 Schema
+ */
+export const TaskListSchema = {
+  name: 'task_list',
+  description: '列出任务，支持状态过滤、搜索和分页',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      status: {
+        type: 'string' as const,
+        enum: ['active', 'completed', 'archived', 'all'],
+        description: '状态过滤',
+        default: 'all',
+      },
+      limit: {
+        type: 'number' as const,
+        minimum: 1,
+        maximum: 100,
+        description: '限制返回数量',
+        default: 20,
+      },
+      offset: {
+        type: 'number' as const,
+        minimum: 0,
+        description: '偏移量',
+        default: 0,
+      },
+      sort: {
+        type: 'string' as const,
+        enum: ['created_at', 'updated_at', 'title'],
+        description: '排序方式',
+        default: 'updated_at',
+      },
+      order: {
+        type: 'string' as const,
+        enum: ['asc', 'desc'],
+        description: '排序方向',
+        default: 'desc',
+      },
+      search: {
+        type: 'string' as const,
+        maxLength: 200,
+        description: '搜索关键词',
+      },
+      project_id: {
+        type: 'string' as const,
+        description: '项目ID（可选，覆盖默认绑定）',
+      },
+    },
+    additionalProperties: false,
+  },
+};
+
+/**
+ * Task Switch 工具 Schema
+ */
+export const TaskSwitchSchema = {
+  name: 'task_switch',
+  description: '切换到指定任务，将其设为当前活跃任务',
+  inputSchema: {
+    type: 'object' as const,
+    properties: {
+      task_id: {
+        type: 'string' as const,
+        minLength: 1,
+        description: '目标任务ID',
+      },
+      project_id: {
+        type: 'string' as const,
+        description: '项目ID（可选，覆盖默认绑定）',
+      },
+    },
+    required: ['task_id'],
+    additionalProperties: false,
+  },
+};
+
+/**
  * 所有工具的 Schema 定义
  */
 export const ToolSchemas = {
@@ -476,6 +554,8 @@ export const ToolSchemas = {
   current_task_log: CurrentTaskLogSchema,
   project_bind: ProjectBindSchema,
   project_info: ProjectInfoSchema,
+  task_list: TaskListSchema,
+  task_switch: TaskSwitchSchema,
 } as const;
 
 /**

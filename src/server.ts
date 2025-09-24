@@ -28,6 +28,8 @@ import {
   CurrentTaskCompleteTool,
   CurrentTaskLogTool,
 } from './tools/task-tools.js';
+import { TaskListTool, TaskSwitchTool } from './tools/multi-task-tools.js';
+import { MultiTaskDirectoryManager } from './core/multi-task-directory-manager.js';
 import { ProjectRootManager } from './core/project-root-manager.js';
 import { ProjectManager } from './core/project-manager.js';
 import { toolRegistry } from './core/tool-registry.js';
@@ -45,6 +47,7 @@ class WaveForgeServer {
   private readonly projectRootManager: ProjectRootManager;
   private readonly projectManager: ProjectManager;
   private taskManager: TaskManager;
+  private multiTaskDirectoryManager: MultiTaskDirectoryManager | null = null;
   private readonly startTime: number;
   private readonly serverId: string;
   private readonly middleware: ReturnType<typeof errorHandler.createMiddleware>;
@@ -442,6 +445,50 @@ class WaveForgeServer {
       enabled: true,
     });
 
+    // 注册 task_list 工具
+    toolRegistry.registerTool({
+      name: 'task_list',
+      handler: {
+        getDefinition: () => TaskListTool.getDefinition(),
+        handle: async (args) => {
+          if (!this.multiTaskDirectoryManager) {
+            throw new Error('多任务目录管理器未初始化');
+          }
+          const tool = new TaskListTool(
+            null, // taskIndexManager - 暂时为null，后续实现
+            this.multiTaskDirectoryManager,
+            this.taskManager
+          );
+          return await tool.handle(args);
+        },
+      },
+      category: 'task',
+      description: '列出任务，支持状态过滤、搜索和分页',
+      enabled: true,
+    });
+
+    // 注册 task_switch 工具
+    toolRegistry.registerTool({
+      name: 'task_switch',
+      handler: {
+        getDefinition: () => TaskSwitchTool.getDefinition(),
+        handle: async (args) => {
+          if (!this.multiTaskDirectoryManager) {
+            throw new Error('多任务目录管理器未初始化');
+          }
+          const tool = new TaskSwitchTool(
+            null, // taskIndexManager - 暂时为null，后续实现
+            this.multiTaskDirectoryManager,
+            this.taskManager
+          );
+          return await tool.handle(args);
+        },
+      },
+      category: 'task',
+      description: '切换到指定任务，将其设为当前活跃任务',
+      enabled: true,
+    });
+
     logger.info(LogCategory.Task, LogAction.Create, '任务管理工具注册完成', {
       tools: toolRegistry.getStats(),
     });
@@ -604,6 +651,7 @@ class WaveForgeServer {
       });
 
       this.taskManager = new TaskManager(waveDir, this.projectManager);
+      this.multiTaskDirectoryManager = new MultiTaskDirectoryManager(waveDir);
 
       // 创建 stdio 传输
       const transport = new StdioServerTransport();

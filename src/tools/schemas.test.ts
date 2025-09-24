@@ -164,7 +164,7 @@ describe('Schema 定义验证', () => {
     it('getToolDefinitions 应该返回所有工具定义', () => {
       const definitions = getToolDefinitions();
 
-      expect(definitions).toHaveLength(10);
+      expect(definitions).toHaveLength(12);
       definitions.forEach((def) => {
         expect(def).toHaveProperty('name');
         expect(def).toHaveProperty('description');
@@ -552,16 +552,18 @@ describe('Schema 验证工具函数', () => {
     it('应该返回正确的工具统计信息', () => {
       const stats = getToolsStatistics();
 
-      expect(stats.total).toBe(10);
+      expect(stats.total).toBe(12);
       expect(stats.taskManagement).toBe(6);
-      expect(stats.system).toBe(2);
+      expect(stats.system).toBe(4);
       expect(stats.projectManagement).toBe(2);
-      expect(stats.tools.all).toHaveLength(10);
+      expect(stats.tools.all).toHaveLength(12);
       expect(stats.tools.taskManagement).toHaveLength(6);
-      expect(stats.tools.system).toHaveLength(2);
+      expect(stats.tools.system).toHaveLength(4);
       expect(stats.tools.projectManagement).toHaveLength(2);
       expect(stats.tools.system).toContain('health');
       expect(stats.tools.system).toContain('ping');
+      expect(stats.tools.system).toContain('task_list');
+      expect(stats.tools.system).toContain('task_switch');
     });
   });
 });

@@ -684,3 +684,266 @@ export interface CurrentTask {
   /** 完成时间 (ISO 8601)（可选） */
   completed_at?: string;
 }
+
+/**
+ * 多任务管理相关接口
+ */
+
+/**
+ * 任务归档信息接口
+ * 用于多任务目录结构中的任务存储
+ */
+export interface TaskArchive {
+  /** 任务完整信息 */
+  task: CurrentTask;
+  /** 归档路径 */
+  archivePath: string;
+  /** 归档时间 */
+  archivedAt: string;
+  /** 任务目录路径 */
+  taskDir: string;
+  /** 任务文件路径映射 */
+  files: {
+    /** 任务数据文件 */
+    taskJson: string;
+    /** 当前任务文档 */
+    currentMd: string;
+    /** 结构化日志文件 */
+    logsJsonl: string;
+    /** 开发日志文件（可选） */
+    devlogMd?: string;
+  };
+}
+
+/**
+ * 任务摘要信息接口
+ * 用于任务列表和索引
+ */
+export interface TaskSummary {
+  /** 任务唯一标识 */
+  id: string;
+  /** 任务标题 */
+  title: string;
+  /** 任务slug */
+  slug: string;
+  /** 任务状态 */
+  status: 'active' | 'completed' | 'archived';
+  /** 创建时间 */
+  created_at: string;
+  /** 完成时间（可选） */
+  completed_at?: string;
+  /** 更新时间 */
+  updated_at: string;
+  /** 任务目标摘要 */
+  goal: string;
+  /** 任务目录路径 */
+  taskDir: string;
+  /** 计划进度 */
+  progress: {
+    /** 总计划数 */
+    totalPlans: number;
+    /** 已完成计划数 */
+    completedPlans: number;
+    /** 当前计划ID */
+    currentPlanId?: string;
+  };
+}
+
+/**
+ * 任务索引接口
+ * 用于管理所有任务的索引信息
+ */
+export interface TaskIndex {
+  /** 索引版本 */
+  version: string;
+  /** 最后更新时间 */
+  updated_at: string;
+  /** 任务摘要列表 */
+  tasks: TaskSummary[];
+  /** 统计信息 */
+  stats: {
+    /** 总任务数 */
+    total: number;
+    /** 活跃任务数 */
+    active: number;
+    /** 已完成任务数 */
+    completed: number;
+    /** 已归档任务数 */
+    archived: number;
+  };
+}
+
+/**
+ * 最新任务指针接口
+ * 用于快速访问最新任务
+ */
+export interface LatestTaskPointer {
+  /** 当前活跃任务ID */
+  current_task_id?: string;
+  /** 最后更新时间 */
+  updated_at: string;
+  /** 最近任务列表（最多10个） */
+  recent_tasks: Array<{
+    id: string;
+    title: string;
+    slug: string;
+    updated_at: string;
+    taskDir: string;
+  }>;
+}
+
+/**
+ * Slug视图索引接口
+ * 用于按slug快速查找任务
+ */
+export interface SlugViewIndex {
+  /** slug名称 */
+  slug: string;
+  /** 关联的任务列表 */
+  tasks: Array<{
+    id: string;
+    title: string;
+    created_at: string;
+    taskDir: string;
+    status: 'active' | 'completed' | 'archived';
+  }>;
+  /** 最后更新时间 */
+  updated_at: string;
+}
+
+/**
+ * 任务目录路径信息接口
+ */
+export interface TaskDirectoryInfo {
+  /** 任务ID */
+  taskId: string;
+  /** 任务slug */
+  slug: string;
+  /** 创建日期 */
+  date: Date;
+  /** 完整目录路径 */
+  fullPath: string;
+  /** 相对路径（相对于.wave/tasks/） */
+  relativePath: string;
+  /** 目录名称（<slug>--<id8>格式） */
+  dirName: string;
+  /** 短ID（ULID前8位） */
+  shortId: string;
+}
+
+/**
+ * 任务列表查询参数接口
+ */
+export interface TaskListParams {
+  /** 状态过滤 */
+  status?: 'active' | 'completed' | 'archived' | 'all';
+  /** 限制返回数量 */
+  limit?: number;
+  /** 偏移量 */
+  offset?: number;
+  /** 排序方式 */
+  sort?: 'created_at' | 'updated_at' | 'title';
+  /** 排序方向 */
+  order?: 'asc' | 'desc';
+  /** 搜索关键词 */
+  search?: string;
+  /** 项目ID过滤 */
+  project_id?: string;
+}
+
+/**
+ * 任务列表响应接口
+ */
+export interface TaskListResponse {
+  /** 任务摘要列表 */
+  tasks: TaskSummary[];
+  /** 总数 */
+  total: number;
+  /** 分页信息 */
+  pagination: {
+    limit: number;
+    offset: number;
+    hasMore: boolean;
+  };
+  /** 统计信息 */
+  stats: TaskIndex['stats'];
+}
+
+/**
+ * 任务切换参数接口
+ */
+export interface TaskSwitchParams {
+  /** 目标任务ID */
+  task_id: string;
+  /** 项目ID（可选） */
+  project_id?: string;
+}
+
+/**
+ * 任务切换响应接口
+ */
+export interface TaskSwitchResponse {
+  /** 切换成功标志 */
+  switched: true;
+  /** 当前任务ID */
+  current_task_id: string;
+  /** 任务信息 */
+  task: CurrentTask;
+  /** 切换时间 */
+  switched_at: string;
+}
+
+/**
+ * 数据迁移状态接口
+ */
+export interface MigrationStatus {
+  /** 是否需要迁移 */
+  needsMigration: boolean;
+  /** 迁移类型 */
+  migrationType: 'single_to_multi' | 'structure_upgrade' | 'none';
+  /** 发现的旧数据 */
+  legacyData: {
+    /** 旧的current-task.json文件 */
+    currentTaskJson?: string;
+    /** 旧的history目录 */
+    historyDir?: string;
+    /** 其他需要迁移的文件 */
+    otherFiles: string[];
+  };
+  /** 迁移计划 */
+  migrationPlan: {
+    /** 需要创建的目录 */
+    directoriesToCreate: string[];
+    /** 需要移动的文件 */
+    filesToMove: Array<{
+      from: string;
+      to: string;
+    }>;
+    /** 需要转换的数据 */
+    dataToTransform: Array<{
+      source: string;
+      target: string;
+      type: 'task_json' | 'logs_jsonl' | 'current_md';
+    }>;
+  };
+}
+
+/**
+ * 数据迁移结果接口
+ */
+export interface MigrationResult {
+  /** 迁移是否成功 */
+  success: boolean;
+  /** 迁移的任务数量 */
+  migratedTasks: number;
+  /** 创建的文件列表 */
+  createdFiles: string[];
+  /** 移动的文件列表 */
+  movedFiles: string[];
+  /** 错误信息 */
+  errors: string[];
+  /** 警告信息 */
+  warnings: string[];
+  /** 迁移耗时（毫秒） */
+  duration: number;
+}

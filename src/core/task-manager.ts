@@ -8,6 +8,7 @@ import fs from 'fs-extra';
 import * as path from 'path';
 import { ulid } from 'ulid';
 import { logger } from './logger.js';
+import { MultiTaskDirectoryManager } from './multi-task-directory-manager.js';
 import {
   TaskStatus,
   LogLevel,
@@ -118,6 +119,7 @@ export class TaskManager {
   private docsPath: string;
   private currentTaskPath: string;
   private projectManager?: import('./project-manager.js').ProjectManager;
+  private multiTaskDirectoryManager: MultiTaskDirectoryManager;
 
   constructor(
     docsPath: string,
@@ -130,6 +132,9 @@ export class TaskManager {
     this.docsPath = docsPath.trim();
     this.currentTaskPath = path.join(this.docsPath, 'current-task.json');
     this.projectManager = projectManager;
+    this.multiTaskDirectoryManager = new MultiTaskDirectoryManager(
+      this.docsPath
+    );
   }
 
   getDocsPath(): string {
@@ -628,9 +633,35 @@ export class TaskManager {
   private async saveTask(task: CurrentTask, projectId?: string): Promise<void> {
     // 确保目录存在
     await this.ensureDirectoryExists(projectId);
+
+    // 保存到当前任务文件（向后兼容）
     const taskPath = await this.resolveTaskPath(projectId);
     const taskData = JSON.stringify(task, null, 2);
     await fs.writeFile(taskPath, taskData, 'utf8');
+
+    // 同时保存到多任务目录结构
+    try {
+      // 检查任务是否已经存在于多任务目录中
+      const existingTaskDir =
+        await this.multiTaskDirectoryManager.findTaskDirectory(task.id);
+
+      if (existingTaskDir) {
+        // 更新现有任务
+        await this.multiTaskDirectoryManager.updateTaskInDirectory(
+          task,
+          existingTaskDir
+        );
+      } else {
+        // 创建新的任务目录
+        await this.multiTaskDirectoryManager.saveTaskToDirectory(task);
+      }
+    } catch (error) {
+      // 多任务目录保存失败不应该影响主要功能
+      logger.warning(LogCategory.Task, LogAction.Create, '多任务目录保存失败', {
+        taskId: task.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   private validateUpdateParams(params: TaskUpdateParams): void {
