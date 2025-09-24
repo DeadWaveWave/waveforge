@@ -9,6 +9,7 @@ import * as path from 'path';
 import { ulid } from 'ulid';
 import { logger } from './logger.js';
 import { MultiTaskDirectoryManager } from './multi-task-directory-manager.js';
+import { DataMigrationTool } from './data-migration-tool.js';
 import {
   TaskStatus,
   LogLevel,
@@ -120,6 +121,8 @@ export class TaskManager {
   private currentTaskPath: string;
   private projectManager?: import('./project-manager.js').ProjectManager;
   private multiTaskDirectoryManager: MultiTaskDirectoryManager;
+  private dataMigrationTool: DataMigrationTool;
+  private migrationChecked: boolean = false;
 
   constructor(
     docsPath: string,
@@ -135,6 +138,7 @@ export class TaskManager {
     this.multiTaskDirectoryManager = new MultiTaskDirectoryManager(
       this.docsPath
     );
+    this.dataMigrationTool = new DataMigrationTool(this.docsPath);
   }
 
   getDocsPath(): string {
@@ -143,6 +147,62 @@ export class TaskManager {
 
   getCurrentTaskPath(): string {
     return this.currentTaskPath;
+  }
+
+  /**
+   * 检查并执行自动迁移
+   */
+  private async checkAndPerformMigration(): Promise<void> {
+    if (this.migrationChecked) {
+      return;
+    }
+
+    try {
+      // 在测试环境中跳过迁移检查
+      if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') {
+        this.migrationChecked = true;
+        return;
+      }
+
+      const migrationStatus =
+        await this.dataMigrationTool.checkMigrationStatus();
+
+      if (migrationStatus.needsMigration) {
+        logger.info(
+          LogCategory.Task,
+          LogAction.Create,
+          '检测到需要数据迁移，开始自动迁移',
+          {
+            migrationType: migrationStatus.migrationType,
+          }
+        );
+
+        const migrationResult = await this.dataMigrationTool.performMigration();
+
+        if (migrationResult.success) {
+          logger.info(LogCategory.Task, LogAction.Create, '数据迁移完成', {
+            migratedTasks: migrationResult.migratedTasks,
+            duration: migrationResult.duration,
+          });
+        } else {
+          logger.error(LogCategory.Task, LogAction.Create, '数据迁移失败', {
+            errors: migrationResult.errors,
+          });
+        }
+      }
+    } catch (error) {
+      // 迁移失败不应该影响正常的任务操作
+      logger.warning(
+        LogCategory.Task,
+        LogAction.Create,
+        '迁移检查失败，继续正常操作',
+        {
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    } finally {
+      this.migrationChecked = true;
+    }
   }
 
   /**
@@ -357,6 +417,9 @@ export class TaskManager {
    */
   async getCurrentTask(projectId?: string): Promise<CurrentTask | null> {
     try {
+      // 首先检查并执行自动迁移
+      await this.checkAndPerformMigration();
+
       const taskPath = await this.resolveTaskPath(projectId);
 
       // 检查文件是否存在
@@ -639,6 +702,9 @@ export class TaskManager {
     const taskData = JSON.stringify(task, null, 2);
     await fs.writeFile(taskPath, taskData, 'utf8');
 
+    // 生成并保存 current-task.md
+    await this.generateCurrentTaskMarkdown(task, projectId);
+
     // 同时保存到多任务目录结构
     try {
       // 检查任务是否已经存在于多任务目录中
@@ -661,6 +727,168 @@ export class TaskManager {
         taskId: task.id,
         error: error instanceof Error ? error.message : String(error),
       });
+    }
+  }
+
+  /**
+   * 生成并保存 current-task.md 文件
+   */
+  private async generateCurrentTaskMarkdown(
+    task: CurrentTask,
+    projectId?: string
+  ): Promise<void> {
+    try {
+      const projectPath = await this.resolveProjectPath(projectId);
+      // current-task.md 应该在 .wave 目录下
+      const markdownPath = path.join(projectPath, 'current-task.md');
+
+      const markdownContent = this.generateTaskMarkdownContent(task);
+      await fs.writeFile(markdownPath, markdownContent, 'utf8');
+
+      logger.info(
+        LogCategory.Task,
+        LogAction.Update,
+        'current-task.md 已更新',
+        {
+          taskId: task.id,
+          markdownPath,
+        }
+      );
+    } catch (error) {
+      logger.error(
+        LogCategory.Task,
+        LogAction.Update,
+        'current-task.md 生成失败',
+        {
+          taskId: task.id,
+          error: error instanceof Error ? error.message : String(error),
+        }
+      );
+    }
+  }
+
+  /**
+   * 生成任务的 Markdown 内容
+   */
+  private generateTaskMarkdownContent(task: CurrentTask): string {
+    const lines = [
+      `# ${task.title}`,
+      '',
+      `> **任务ID**: ${task.id}`,
+      `> **创建时间**: ${new Date(task.created_at).toLocaleString()}`,
+      `> **更新时间**: ${new Date(task.updated_at).toLocaleString()}`,
+      task.completed_at
+        ? `> **完成时间**: ${new Date(task.completed_at).toLocaleString()}`
+        : '',
+      '',
+      '## 验收标准',
+      '',
+      task.goal,
+      '',
+    ];
+
+    // 添加任务级提示
+    if (task.task_hints && task.task_hints.length > 0) {
+      lines.push('## 任务提示');
+      lines.push('');
+      task.task_hints.forEach((hint) => {
+        lines.push(`- ${hint}`);
+      });
+      lines.push('');
+    }
+
+    // 添加整体计划
+    lines.push('## 整体计划');
+    lines.push('');
+
+    if (task.overall_plan && task.overall_plan.length > 0) {
+      task.overall_plan.forEach((plan, index) => {
+        const status = this.getStatusIcon(plan.status);
+        const isCurrentPlan = plan.id === task.current_plan_id;
+        const planTitle = isCurrentPlan
+          ? `**${plan.description}** (当前)`
+          : plan.description;
+
+        lines.push(`${index + 1}. ${status} ${planTitle}`);
+
+        // 添加计划级提示
+        if (plan.hints && plan.hints.length > 0) {
+          lines.push('   > 提示:');
+          plan.hints.forEach((hint) => {
+            lines.push(`   > - ${hint}`);
+          });
+        }
+
+        // 添加步骤
+        if (plan.steps && plan.steps.length > 0) {
+          plan.steps.forEach((step) => {
+            const stepStatus = this.getStatusIcon(step.status);
+            lines.push(`   - ${stepStatus} ${step.description}`);
+
+            // 添加步骤级提示
+            if (step.hints && step.hints.length > 0) {
+              lines.push('     > 提示:');
+              step.hints.forEach((hint) => {
+                lines.push(`     > - ${hint}`);
+              });
+            }
+
+            // 添加证据和备注
+            if (step.evidence) {
+              lines.push(`     > 证据: ${step.evidence}`);
+            }
+            if (step.notes) {
+              lines.push(`     > 备注: ${step.notes}`);
+            }
+          });
+        }
+        lines.push('');
+      });
+    } else {
+      lines.push('暂无计划');
+      lines.push('');
+    }
+
+    // 添加关键日志（最近5条）
+    if (task.logs && task.logs.length > 0) {
+      lines.push('## 关键日志');
+      lines.push('');
+      const recentLogs = task.logs.slice(-5);
+      recentLogs.forEach((log) => {
+        const timestamp = new Date(log.timestamp).toLocaleString();
+        lines.push(`- **${timestamp}** [${log.level}] ${log.message}`);
+        if (log.ai_notes) {
+          lines.push(`  > ${log.ai_notes}`);
+        }
+      });
+      lines.push('');
+    }
+
+    lines.push('---');
+    lines.push('');
+    lines.push('*由 WaveForge MCP 任务管理系统自动生成*');
+    lines.push('');
+    lines.push('> ⚠️ **注意**: 此文件由系统自动生成和维护。');
+    lines.push('> 如需修改任务内容，请使用 MCP 工具或直接编辑此文件。');
+    lines.push('> 系统会自动检测文件变更并同步到任务数据中。');
+
+    return lines.filter((line) => line !== null).join('\n');
+  }
+
+  /**
+   * 获取状态图标
+   */
+  private getStatusIcon(status: string): string {
+    switch (status) {
+      case 'completed':
+        return '✅';
+      case 'in_progress':
+        return '🔄';
+      case 'blocked':
+        return '🚫';
+      case 'to_do':
+      default:
+        return '⏳';
     }
   }
 
