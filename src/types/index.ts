@@ -1539,3 +1539,43 @@ export interface NumberPathMatch {
   /** 是否为步骤级（深度大于1） */
   isStep: boolean;
 }
+/**
+ * 任务数据接口（用于同步引擎）
+ * 基于 CurrentTask 的简化版本，专门用于同步操作
+ */
+export interface TaskData {
+  /** 任务唯一标识 */
+  id: string;
+  /** 任务标题 */
+  title: string;
+  /** 任务验收标准和成功指标 */
+  goal: string;
+  /** 需求列表 */
+  requirements: string[];
+  /** 问题列表 */
+  issues?: string[];
+  /** 任务级提示 */
+  hints?: string[];
+  /** 整体计划列表 */
+  plans?: TaskPlan[];
+  /** 当前执行的计划ID */
+  currentPlan?: string;
+  /** 当前步骤ID */
+  currentStep?: string;
+  /** 预期可见结果列表 */
+  expectedResults?: ExpectedResult[];
+  /** 上下文标签 */
+  contextTags?: ContextTag[];
+  /** 任务状态 */
+  status?: 'active' | 'completed' | 'archived';
+  /** 创建时间 */
+  createdAt: string;
+  /** 更新时间 */
+  updatedAt: string;
+  /** 项目ID */
+  projectId: string;
+  /** MD 版本（ETag） */
+  mdVersion?: string;
+  /** 区域指纹 */
+  sectionFingerprints?: SectionFingerprints;
+}

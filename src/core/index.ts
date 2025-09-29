@@ -22,3 +22,19 @@ export {
   createEVRValidator,
   type EVRValidatorOptions,
 } from './evr-validator.js';
+export {
+  LazySync,
+  createLazySync,
+  type ConflictStrategy,
+  type SyncDiff,
+  type ContentChange,
+  type StatusChange,
+  type AppliedChange,
+  type SyncResult,
+  type LazySyncOptions,
+} from './lazy-sync.js';
+export {
+  FakeTaskStore,
+  createFakeTaskStore,
+  type FakeTaskStoreOptions,
+} from './fake-task-store.js';
