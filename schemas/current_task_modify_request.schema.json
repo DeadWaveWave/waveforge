@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://waveforge.dev/schemas/current_task_modify_request.schema.json",
+  "title": "Current Task Modify Request",
+  "description": "Request schema for current_task_modify MCP tool",
+  "type": "object",
+  "properties": {
+    "field": {
+      "type": "string",
+      "enum": [
+        "title",
+        "goal",
+        "requirements",
+        "plan",
+        "steps",
+        "evr",
+        "issues",
+        "hints"
+      ],
+      "description": "Field to modify: goal=acceptance criteria, plan=overall plan, steps=plan steps, evr=EVR content, hints=user hints"
+    },
+    "content": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        {
+          "type": "object",
+          "properties": {
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "evr_id": {
+                    "type": "string",
+                    "pattern": "^evr-\\d+$"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "verify": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "minItems": 1
+                      }
+                    ]
+                  },
+                  "expect": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "minItems": 1
+                      }
+                    ]
+                  },
+                  "class": {
+                    "type": "string",
+                    "enum": ["runtime", "static"],
+                    "default": "runtime"
+                  }
+                }
+              },
+              "minItems": 1
+            },
+            "evr_ids": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "pattern": "^evr-\\d+$"
+              },
+              "description": "EVR IDs for remove/rebind operations"
+            }
+          }
+        }
+      ],
+      "description": "Modification content (string, string array, or EVR object)"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500,
+      "description": "Reason for modification"
+    },
+    "plan_id": {
+      "type": "string",
+      "pattern": "^plan-\\d+$",
+      "description": "Plan ID for plan-specific modifications"
+    },
+    "step_id": {
+      "type": "string",
+      "pattern": "^step-\\d+$",
+      "description": "Step ID for step-specific modifications"
+    },
+    "change_type": {
+      "type": "string",
+      "enum": [
+        "generate_steps",
+        "plan_adjustment",
+        "steps_adjustment",
+        "refine_goal",
+        "bug_fix_replan",
+        "user_request",
+        "scope_change"
+      ],
+      "description": "Type of change"
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "Project ID (optional, overrides default binding)"
+    }
+  },
+  "required": ["field", "content", "reason", "change_type"],
+  "additionalProperties": false
+}

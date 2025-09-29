@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://waveforge.dev/schemas/current_task_update_response.schema.json",
+  "title": "Current Task Update Response",
+  "description": "Response schema for current_task_update MCP tool",
+  "type": "object",
+  "properties": {
+    "updated": {
+      "type": "boolean",
+      "description": "Whether the update was successful"
+    },
+    "evr_for_node": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^evr-\\d+$"
+      },
+      "description": "EVR IDs to guide attention when plan switches to in_progress"
+    },
+    "evr_pending": {
+      "type": "boolean",
+      "description": "Whether there are pending EVRs blocking plan completion"
+    },
+    "evr_for_plan": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^evr-\\d+$"
+      },
+      "description": "EVR IDs bound to the plan (when evr_pending=true)"
+    },
+    "sync_preview": {
+      "type": "object",
+      "properties": {
+        "applied": {
+          "type": "boolean",
+          "description": "Whether changes were applied (true for update/modify/complete)"
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": ["content", "structure"]
+              },
+              "section": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              },
+              "old_value": {},
+              "new_value": {},
+              "source": {
+                "type": "string",
+                "enum": ["panel", "structured"]
+              }
+            },
+            "required": [
+              "type",
+              "section",
+              "field",
+              "old_value",
+              "new_value",
+              "source"
+            ]
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "region": {
+                "type": "string"
+              },
+              "field": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string",
+                "enum": ["etag_mismatch", "concurrent_update", "parse_error"]
+              },
+              "ours_ts": {
+                "type": ["string", "null"],
+                "format": "date-time"
+              },
+              "theirs_ts": {
+                "type": ["string", "null"],
+                "format": "date-time"
+              }
+            },
+            "required": ["region", "field", "reason"]
+          }
+        },
+        "affected_sections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["applied", "changes", "conflicts", "affected_sections"]
+    },
+    "logs_highlights": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "level": {
+            "type": "string",
+            "enum": ["INFO", "WARN", "ERROR"]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "TEST",
+              "TASK",
+              "EXCEPTION",
+              "DISCUSSION",
+              "PLAN",
+              "SYSTEM"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": ["UPDATE", "CREATE", "MODIFY", "SWITCH", "HANDLE"]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["ts", "level", "category", "action", "message"]
+      },
+      "maxItems": 10,
+      "description": "Recent log highlights"
+    }
+  },
+  "required": ["updated"],
+  "additionalProperties": false
+}

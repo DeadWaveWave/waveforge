@@ -947,3 +947,323 @@ export interface MigrationResult {
   /** 迁移耗时（毫秒） */
   duration: number;
 }
+
+// ============================================================================
+// 面向结果的任务管理系统 - 核心类型定义
+// ============================================================================
+
+/**
+ * 预期可见结果（EVR）状态枚举
+ */
+export enum EVRStatus {
+  /** 通过 - 验证成功 */
+  Pass = 'pass',
+  /** 失败 - 验证失败 */
+  Fail = 'fail',
+  /** 跳过 - 有理由跳过验证 */
+  Skip = 'skip',
+  /** 未知 - 尚未验证 */
+  Unknown = 'unknown',
+}
+
+/**
+ * EVR 类别枚举
+ */
+export enum EVRClass {
+  /** 运行时验证 - 需要执行后验证 */
+  Runtime = 'runtime',
+  /** 静态验证 - 可一次性验证 */
+  Static = 'static',
+}
+
+/**
+ * 同步冲突类型枚举
+ */
+export enum SyncConflictType {
+  /** ETag 不匹配 */
+  EtagMismatch = 'etag_mismatch',
+  /** 并发更新 */
+  ConcurrentUpdate = 'concurrent_update',
+  /** 解析错误 */
+  ParseError = 'parse_error',
+}
+
+/**
+ * 冲突解决策略枚举
+ */
+export enum ConflictResolution {
+  /** 使用我们的版本 */
+  Ours = 'ours',
+  /** 使用他们的版本 */
+  Theirs = 'theirs',
+  /** 合并版本 */
+  Merged = 'merged',
+}
+
+/**
+ * 错误码枚举
+ */
+export enum ErrorCode {
+  // 连接相关
+  NO_PROJECT_BOUND = 'NO_PROJECT_BOUND',
+  NO_ACTIVE_TASK = 'NO_ACTIVE_TASK',
+  INVALID_ROOT = 'INVALID_ROOT',
+  NOT_FOUND = 'NOT_FOUND',
+  MULTIPLE_CANDIDATES = 'MULTIPLE_CANDIDATES',
+  MISSING_PERMISSIONS = 'MISSING_PERMISSIONS',
+
+  // EVR 相关
+  EVR_NOT_READY = 'EVR_NOT_READY',
+  EVR_VALIDATION_FAILED = 'EVR_VALIDATION_FAILED',
+
+  // 同步相关
+  SYNC_CONFLICT = 'SYNC_CONFLICT',
+  PARSE_ERROR = 'PARSE_ERROR',
+  RENDER_ERROR = 'RENDER_ERROR',
+
+  // 业务逻辑
+  INVALID_STATE_TRANSITION = 'INVALID_STATE_TRANSITION',
+  PLAN_GATE_BLOCKED = 'PLAN_GATE_BLOCKED',
+}
+
+/**
+ * 预期可见结果（EVR）接口
+ */
+export interface ExpectedResult {
+  /** EVR 唯一标识 */
+  id: string;
+  /** EVR 标题 */
+  title: string;
+  /** 验证方法（字符串或字符串数组） */
+  verify: string | string[];
+  /** 预期结果（字符串或字符串数组） */
+  expect: string | string[];
+  /** EVR 状态 */
+  status: EVRStatus;
+  /** EVR 类别 */
+  class?: EVRClass;
+  /** 最后运行时间 */
+  lastRun?: string;
+  /** 备注信息 */
+  notes?: string;
+  /** 证据链接 */
+  proof?: string;
+  /** 引用该 EVR 的计划 IDs */
+  referencedBy: string[];
+  /** 验证运行记录 */
+  runs: VerificationRun[];
+}
+
+/**
+ * 验证运行记录接口
+ */
+export interface VerificationRun {
+  /** 运行时间 */
+  at: string;
+  /** 运行者 */
+  by: 'ai' | 'user' | 'ci' | string;
+  /** 运行状态 */
+  status: EVRStatus;
+  /** 运行备注 */
+  notes?: string;
+  /** 运行证据 */
+  proof?: string;
+}
+
+/**
+ * EVR 摘要接口
+ */
+export interface EVRSummary {
+  /** 总数 */
+  total: number;
+  /** 通过的 EVR IDs */
+  passed: string[];
+  /** 跳过的 EVR IDs */
+  skipped: string[];
+  /** 失败的 EVR IDs */
+  failed: string[];
+  /** 未知状态的 EVR IDs */
+  unknown: string[];
+  /** 未被引用的 EVR IDs */
+  unreferenced: string[];
+}
+
+/**
+ * EVR 详情接口（用于 TaskReadResponse）
+ */
+export interface EVRDetail {
+  /** EVR ID */
+  evrId: string;
+  /** EVR 标题 */
+  title: string;
+  /** EVR 状态 */
+  status: EVRStatus;
+  /** 最后运行时间 */
+  lastRun?: string;
+  /** 引用该 EVR 的计划 IDs */
+  referencedBy: string[];
+  /** 验证运行记录 */
+  runs: VerificationRun[];
+}
+
+/**
+ * 上下文标签接口
+ */
+export interface ContextTag {
+  /** 标签类型 */
+  tag: string;
+  /** 标签值 */
+  value: string;
+  /** 标签类型分类 */
+  type:
+    | 'ref'
+    | 'decision'
+    | 'discuss'
+    | 'inputs'
+    | 'constraints'
+    | 'evr'
+    | 'uses_evr';
+}
+
+/**
+ * 同步冲突接口
+ */
+export interface SyncConflict {
+  /** 冲突区域 */
+  region: string;
+  /** 冲突字段 */
+  field: string;
+  /** 冲突原因 */
+  reason: SyncConflictType;
+  /** 我们的时间戳 */
+  oursTs?: string;
+  /** 他们的时间戳 */
+  theirsTs?: string;
+}
+
+/**
+ * 已解决冲突接口
+ */
+export interface ResolvedConflict extends SyncConflict {
+  /** 解决方案 */
+  resolution: ConflictResolution;
+}
+
+/**
+ * 同步变更接口
+ */
+export interface SyncChange {
+  /** 变更类型 */
+  type: 'content' | 'structure';
+  /** 变更区域 */
+  section: string;
+  /** 变更字段 */
+  field: string;
+  /** 旧值 */
+  oldValue: any;
+  /** 新值 */
+  newValue: any;
+  /** 变更来源 */
+  source: 'panel' | 'structured';
+}
+
+/**
+ * 同步预览接口
+ */
+export interface SyncPreview {
+  /** 是否已应用 */
+  applied: boolean;
+  /** 变更列表 */
+  changes: SyncChange[];
+  /** 冲突列表 */
+  conflicts: SyncConflict[];
+  /** 受影响的区域 */
+  affectedSections: string[];
+}
+
+/**
+ * 区域指纹接口
+ */
+export interface SectionFingerprints {
+  /** 标题指纹 */
+  title: string;
+  /** 需求指纹 */
+  requirements: string;
+  /** 问题指纹 */
+  issues: string;
+  /** 提示指纹 */
+  hints: string;
+  /** 计划指纹映射 */
+  plans: Record<string, string>;
+  /** EVR 指纹映射 */
+  evrs: Record<string, string>;
+  /** 日志指纹 */
+  logs: string;
+}
+
+/**
+ * 审计日志条目接口
+ */
+export interface AuditEntry {
+  /** 时间戳 */
+  timestamp: string;
+  /** 类型 */
+  type: 'sync' | 'conflict' | 'panel_edit';
+  /** 详情 */
+  details: Record<string, any>;
+  /** 受影响的 IDs */
+  affectedIds: string[];
+}
+
+/**
+ * EVR 验证结果接口
+ */
+export interface EVRValidationResult {
+  /** 是否就绪 */
+  ready: boolean;
+  /** EVR 摘要 */
+  summary: EVRSummary;
+  /** 需要最终验证的 EVR 列表 */
+  requiredFinal: Array<{
+    evr_id: string;
+    reason: 'need_reason_for_skip' | 'status_unknown' | 'failed';
+  }>;
+}
+
+/**
+ * 计划门槛检查结果接口
+ */
+export interface PlanGateResult {
+  /** 是否可以完成 */
+  canComplete: boolean;
+  /** 待处理的 EVR IDs */
+  pendingEVRs: string[];
+  /** 绑定的 EVR IDs */
+  boundEVRs: string[];
+}
+
+/**
+ * 任务完成检查结果接口
+ */
+export interface TaskCompletionResult {
+  /** 是否可以完成 */
+  canComplete: boolean;
+  /** EVR 验证结果 */
+  evrValidation: EVRValidationResult;
+  /** 错误码 */
+  errorCode?: ErrorCode;
+}
+
+/**
+ * 静态 EVR 验证结果接口
+ */
+export interface StaticValidationResult {
+  /** 是否通过 */
+  passed: boolean;
+  /** 是否满足预期 */
+  meetsExpectation: boolean;
+  /** 是否无差异 */
+  isDiffClean: boolean;
+  /** 验证消息 */
+  message?: string;
+}

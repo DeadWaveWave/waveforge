@@ -1,0 +1,656 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://waveforge.dev/schemas/current_task_read_response.schema.json",
+  "title": "Current Task Read Response",
+  "description": "Response schema for current_task_read MCP tool",
+  "type": "object",
+  "properties": {
+    "task": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "ULID format task identifier"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Task title"
+        },
+        "slug": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "URL-safe task slug"
+        },
+        "goal": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "Task acceptance criteria and success metrics"
+        },
+        "requirements": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "List of task requirements"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "List of known issues"
+        },
+        "plans": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^plan-\\d+$",
+                "description": "Plan identifier"
+              },
+              "text": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Plan description"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["to_do", "in_progress", "completed", "blocked"],
+                "description": "Plan status"
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^step-\\d+$"
+                    },
+                    "text": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["to_do", "in_progress", "completed", "blocked"]
+                    },
+                    "hints": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "context_tags": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/definitions/context_tag"
+                      }
+                    },
+                    "uses_evr": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "pattern": "^evr-\\d+$"
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "text",
+                    "status",
+                    "hints",
+                    "context_tags",
+                    "uses_evr"
+                  ]
+                }
+              },
+              "hints": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "context_tags": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/definitions/context_tag"
+                }
+              },
+              "evr_bindings": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "pattern": "^evr-\\d+$"
+                },
+                "description": "EVR IDs bound to this plan"
+              },
+              "created_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "completed_at": {
+                "type": ["string", "null"],
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "id",
+              "text",
+              "status",
+              "steps",
+              "hints",
+              "context_tags",
+              "evr_bindings"
+            ]
+          }
+        },
+        "current_plan_id": {
+          "type": ["string", "null"],
+          "pattern": "^plan-\\d+$",
+          "description": "Currently active plan ID"
+        },
+        "expected_results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/expected_result"
+          },
+          "description": "List of Expected Visible Results (EVRs)"
+        },
+        "hints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Task-level hints"
+        },
+        "context_tags": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/context_tag"
+          }
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "completed", "archived"],
+          "description": "Task status"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "project_id": {
+          "type": "string",
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+          "description": "Project ULID"
+        },
+        "md_version": {
+          "type": "string",
+          "description": "Markdown version for caching"
+        },
+        "section_fingerprints": {
+          "$ref": "#/definitions/section_fingerprints"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "slug",
+        "goal",
+        "requirements",
+        "issues",
+        "plans",
+        "expected_results",
+        "hints",
+        "context_tags",
+        "status",
+        "created_at",
+        "updated_at",
+        "project_id",
+        "md_version",
+        "section_fingerprints"
+      ]
+    },
+    "evr_ready": {
+      "type": "boolean",
+      "description": "Whether all EVRs are ready for task completion"
+    },
+    "evr_summary": {
+      "$ref": "#/definitions/evr_summary"
+    },
+    "evr_details": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/evr_detail"
+      }
+    },
+    "panel_pending": {
+      "type": "boolean",
+      "description": "Whether panel has pending changes to sync"
+    },
+    "sync_preview": {
+      "$ref": "#/definitions/sync_preview"
+    },
+    "logs_highlights": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/log_entry"
+      },
+      "maxItems": 20,
+      "description": "Highlighted log entries"
+    },
+    "logs_full_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total number of log entries"
+    },
+    "md_version": {
+      "type": "string",
+      "description": "Markdown version for client caching"
+    }
+  },
+  "required": [
+    "task",
+    "evr_ready",
+    "evr_summary",
+    "evr_details",
+    "panel_pending",
+    "logs_highlights",
+    "logs_full_count",
+    "md_version"
+  ],
+  "definitions": {
+    "expected_result": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^evr-\\d+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "verify": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "expect": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "minItems": 1
+            }
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pass", "fail", "skip", "unknown"]
+        },
+        "class": {
+          "type": "string",
+          "enum": ["runtime", "static"],
+          "default": "runtime"
+        },
+        "last_run": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "notes": {
+          "type": ["string", "null"],
+          "maxLength": 2000
+        },
+        "proof": {
+          "type": ["string", "null"],
+          "maxLength": 500
+        },
+        "referenced_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^plan-\\d+$"
+          }
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/verification_run"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "verify",
+        "expect",
+        "status",
+        "referenced_by",
+        "runs"
+      ]
+    },
+    "verification_run": {
+      "type": "object",
+      "properties": {
+        "at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "by": {
+          "type": "string",
+          "enum": ["ai", "user", "ci"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pass", "fail", "skip", "unknown"]
+        },
+        "notes": {
+          "type": ["string", "null"],
+          "maxLength": 2000
+        },
+        "proof": {
+          "type": ["string", "null"],
+          "maxLength": 500
+        }
+      },
+      "required": ["at", "by", "status"]
+    },
+    "context_tag": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "value": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "ref",
+            "decision",
+            "discuss",
+            "inputs",
+            "constraints",
+            "evr",
+            "uses_evr"
+          ]
+        }
+      },
+      "required": ["tag", "value", "type"]
+    },
+    "evr_summary": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^evr-\\d+$"
+          }
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^evr-\\d+$"
+          }
+        },
+        "failed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^evr-\\d+$"
+          }
+        },
+        "unknown": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^evr-\\d+$"
+          }
+        },
+        "unreferenced": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^evr-\\d+$"
+          }
+        }
+      },
+      "required": [
+        "total",
+        "passed",
+        "skipped",
+        "failed",
+        "unknown",
+        "unreferenced"
+      ]
+    },
+    "evr_detail": {
+      "type": "object",
+      "properties": {
+        "evr_id": {
+          "type": "string",
+          "pattern": "^evr-\\d+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pass", "fail", "skip", "unknown"]
+        },
+        "last_run": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "referenced_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^plan-\\d+$"
+          }
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/verification_run"
+          }
+        }
+      },
+      "required": ["evr_id", "title", "status", "referenced_by", "runs"]
+    },
+    "sync_preview": {
+      "type": "object",
+      "properties": {
+        "applied": {
+          "type": "boolean"
+        },
+        "changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/sync_change"
+          }
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/sync_conflict"
+          }
+        },
+        "affected_sections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": ["applied", "changes", "conflicts", "affected_sections"]
+    },
+    "sync_change": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["content", "structure"]
+        },
+        "section": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "old_value": {},
+        "new_value": {},
+        "source": {
+          "type": "string",
+          "enum": ["panel", "structured"]
+        }
+      },
+      "required": [
+        "type",
+        "section",
+        "field",
+        "old_value",
+        "new_value",
+        "source"
+      ]
+    },
+    "sync_conflict": {
+      "type": "object",
+      "properties": {
+        "region": {
+          "type": "string"
+        },
+        "field": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "enum": ["etag_mismatch", "concurrent_update", "parse_error"]
+        },
+        "ours_ts": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "theirs_ts": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        }
+      },
+      "required": ["region", "field", "reason"]
+    },
+    "log_entry": {
+      "type": "object",
+      "properties": {
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "level": {
+          "type": "string",
+          "enum": ["INFO", "WARN", "ERROR"]
+        },
+        "category": {
+          "type": "string",
+          "enum": ["TEST", "TASK", "EXCEPTION", "DISCUSSION", "PLAN", "SYSTEM"]
+        },
+        "action": {
+          "type": "string",
+          "enum": ["UPDATE", "CREATE", "MODIFY", "SWITCH", "HANDLE"]
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": ["ts", "level", "category", "action", "message"]
+    },
+    "section_fingerprints": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "requirements": {
+          "type": "string"
+        },
+        "issues": {
+          "type": "string"
+        },
+        "hints": {
+          "type": "string"
+        },
+        "plans": {
+          "type": "object",
+          "patternProperties": {
+            "^plan-\\d+$": {
+              "type": "string"
+            }
+          }
+        },
+        "evrs": {
+          "type": "object",
+          "patternProperties": {
+            "^evr-\\d+$": {
+              "type": "string"
+            }
+          }
+        },
+        "logs": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title",
+        "requirements",
+        "issues",
+        "hints",
+        "plans",
+        "evrs",
+        "logs"
+      ]
+    }
+  }
+}

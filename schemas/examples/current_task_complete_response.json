@@ -1,0 +1,46 @@
+{
+  "completed": true,
+  "evr_summary": {
+    "total": 5,
+    "passed": ["evr-001", "evr-002", "evr-004"],
+    "skipped": ["evr-003"],
+    "failed": [],
+    "unknown": [],
+    "unreferenced": ["evr-005"]
+  },
+  "evr_required_final": [],
+  "evr_unreferenced": [
+    {
+      "evr_id": "evr-005",
+      "reason": "未被任何计划引用，建议绑定到相关计划或删除"
+    }
+  ],
+  "task_completed_at": "2025-09-29T04:21:00.789Z",
+  "generated_docs": [
+    "docs/tasks/task-20250929-01K69TQVX749GS4GHVPJPEXBDK-建立核心类型定义和基础架构.md",
+    "docs/tasks/task-20250929-01K69TQVX749GS4GHVPJPEXBDK-建立核心类型定义和基础架构-full.md"
+  ],
+  "logs_highlights": [
+    {
+      "ts": "2025-09-29T04:21:00.789Z",
+      "level": "INFO",
+      "category": "TASK",
+      "action": "COMPLETE",
+      "message": "任务已成功完成：建立核心类型定义和基础架构"
+    },
+    {
+      "ts": "2025-09-29T04:21:00.790Z",
+      "level": "INFO",
+      "category": "TASK",
+      "action": "CREATE",
+      "message": "已生成任务文档和开发日志"
+    },
+    {
+      "ts": "2025-09-29T04:21:00.791Z",
+      "level": "INFO",
+      "category": "HEALTH",
+      "action": "UPDATE",
+      "message": "EVR 验证完成，任务质量达标"
+    }
+  ]
+}

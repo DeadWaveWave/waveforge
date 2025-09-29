@@ -1,0 +1,193 @@
+{
+  "task": {
+    "id": "01K69TQVX749GS4GHVPJPEXBDK",
+    "title": "建立核心类型定义和基础架构",
+    "slug": "建立核心类型定义和基础架构",
+    "goal": "创建统一的类型定义文件，实现字段名转换工具，建立错误码枚举和错误处理基础设施，输出四个接口的 JSON 示例与 Schema，并在 CI 中添加 schema 校验",
+    "requirements": [
+      "创建统一的类型定义文件，包含 TaskStatus、EVRSummary、SyncConflict 等核心类型",
+      "实现字段名转换工具（camelCase ↔ snake_case）",
+      "建立错误码枚举和错误处理基础设施"
+    ],
+    "issues": [],
+    "plans": [
+      {
+        "id": "plan-1",
+        "text": "调研当前项目结构和类型定义情况",
+        "status": "completed",
+        "steps": [],
+        "hints": [],
+        "context_tags": [],
+        "evr_bindings": [],
+        "created_at": "2025-09-29T04:12:22.895Z",
+        "completed_at": "2025-09-29T04:13:17.712Z"
+      },
+      {
+        "id": "plan-2",
+        "text": "创建核心类型定义文件（TaskStatus、EVRSummary、SyncConflict等）",
+        "status": "completed",
+        "steps": [],
+        "hints": [],
+        "context_tags": [],
+        "evr_bindings": [],
+        "created_at": "2025-09-29T04:13:17.712Z",
+        "completed_at": "2025-09-29T04:16:35.701Z"
+      },
+      {
+        "id": "plan-3",
+        "text": "实现字段名转换工具（camelCase ↔ snake_case）",
+        "status": "completed",
+        "steps": [],
+        "hints": [],
+        "context_tags": [],
+        "evr_bindings": [],
+        "created_at": "2025-09-29T04:16:35.701Z",
+        "completed_at": "2025-09-29T04:16:49.603Z"
+      },
+      {
+        "id": "plan-4",
+        "text": "建立错误码枚举和错误处理基础设施",
+        "status": "completed",
+        "steps": [],
+        "hints": [],
+        "context_tags": [],
+        "evr_bindings": [],
+        "created_at": "2025-09-29T04:16:49.603Z",
+        "completed_at": "2025-09-29T04:19:36.676Z"
+      },
+      {
+        "id": "plan-5",
+        "text": "输出四个接口的 JSON 示例（current_task_read/update/modify/complete）",
+        "status": "in_progress",
+        "steps": [],
+        "hints": [],
+        "context_tags": [],
+        "evr_bindings": []
+      }
+    ],
+    "current_plan_id": "plan-5",
+    "expected_results": [
+      {
+        "id": "evr-001",
+        "title": "字段风格转换正确",
+        "verify": "验证 camelCase 和 snake_case 字段转换的正确性",
+        "expect": "所有字段名转换符合规范，无混用情况",
+        "status": "unknown",
+        "class": "runtime",
+        "referenced_by": ["plan-3"],
+        "runs": []
+      },
+      {
+        "id": "evr-002",
+        "title": "必填/类型/枚举均通过",
+        "verify": "验证 JSON Schema 校验的完整性",
+        "expect": "所有必填字段、类型约束、枚举值校验正确",
+        "status": "unknown",
+        "class": "static",
+        "referenced_by": ["plan-6"],
+        "runs": []
+      },
+      {
+        "id": "evr-003",
+        "title": "反例能产出明确错误码与定位",
+        "verify": "使用错误的数据测试 Schema 校验",
+        "expect": "返回明确的错误码和字段定位信息",
+        "status": "unknown",
+        "class": "runtime",
+        "referenced_by": ["plan-7"],
+        "runs": []
+      }
+    ],
+    "hints": [],
+    "context_tags": [],
+    "status": "active",
+    "created_at": "2025-09-29T04:12:53.119Z",
+    "updated_at": "2025-09-29T04:19:42.329Z",
+    "project_id": "01K5XNPG6BCJ71GMD9816XCPSF",
+    "md_version": "v1.0.0",
+    "section_fingerprints": {
+      "title": "abc123",
+      "requirements": "def456",
+      "issues": "ghi789",
+      "hints": "jkl012",
+      "plans": {
+        "plan-1": "mno345",
+        "plan-2": "pqr678",
+        "plan-3": "stu901",
+        "plan-4": "vwx234",
+        "plan-5": "yz567"
+      },
+      "evrs": {
+        "evr-001": "aaa111",
+        "evr-002": "bbb222",
+        "evr-003": "ccc333"
+      },
+      "logs": "zzz999"
+    }
+  },
+  "evr_ready": false,
+  "evr_summary": {
+    "total": 3,
+    "passed": [],
+    "skipped": [],
+    "failed": [],
+    "unknown": ["evr-001", "evr-002", "evr-003"],
+    "unreferenced": []
+  },
+  "evr_details": [
+    {
+      "evr_id": "evr-001",
+      "title": "字段风格转换正确",
+      "status": "unknown",
+      "referenced_by": ["plan-3"],
+      "runs": []
+    },
+    {
+      "evr_id": "evr-002",
+      "title": "必填/类型/枚举均通过",
+      "status": "unknown",
+      "referenced_by": ["plan-6"],
+      "runs": []
+    },
+    {
+      "evr_id": "evr-003",
+      "title": "反例能产出明确错误码与定位",
+      "status": "unknown",
+      "referenced_by": ["plan-7"],
+      "runs": []
+    }
+  ],
+  "panel_pending": false,
+  "logs_highlights": [
+    {
+      "ts": "2025-09-29T04:13:17.712Z",
+      "level": "INFO",
+      "category": "PLAN",
+      "action": "UPDATE",
+      "message": "计划 1 已完成：调研当前项目结构和类型定义情况"
+    },
+    {
+      "ts": "2025-09-29T04:16:35.701Z",
+      "level": "INFO",
+      "category": "PLAN",
+      "action": "UPDATE",
+      "message": "计划 2 已完成：创建核心类型定义文件"
+    },
+    {
+      "ts": "2025-09-29T04:16:49.603Z",
+      "level": "INFO",
+      "category": "PLAN",
+      "action": "UPDATE",
+      "message": "计划 3 已完成：实现字段名转换工具"
+    },
+    {
+      "ts": "2025-09-29T04:19:36.676Z",
+      "level": "INFO",
+      "category": "PLAN",
+      "action": "UPDATE",
+      "message": "计划 4 已完成：建立错误码枚举和错误处理基础设施"
+    }
+  ],
+  "logs_full_count": 25,
+  "md_version": "v1.0.0"
+}

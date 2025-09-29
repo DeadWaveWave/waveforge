@@ -1,0 +1,8 @@
+{
+  "update_type": "plan",
+  "plan_id": "plan-5",
+  "status": "completed",
+  "notes": "已成功输出四个接口的 JSON 示例文件，包含完整的字段定义和数据结构。所有字段名都使用 snake_case 格式，符合 MCP 协议规范。",
+  "evidence": "schemas/examples/ 目录下的四个 JSON 示例文件",
+  "project_id": "01K5XNPG6BCJ71GMD9816XCPSF"
+}

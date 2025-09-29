@@ -1,0 +1,188 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://waveforge.dev/schemas/current_task_complete_response.schema.json",
+  "title": "Current Task Complete Response",
+  "description": "Response schema for current_task_complete MCP tool",
+  "type": "object",
+  "properties": {
+    "completed": {
+      "type": "boolean",
+      "description": "Whether the task was successfully completed"
+    },
+    "evr_summary": {
+      "type": "object",
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^evr-\\d+$"
+          }
+        },
+        "skipped": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^evr-\\d+$"
+          }
+        },
+        "failed": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^evr-\\d+$"
+          }
+        },
+        "unknown": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^evr-\\d+$"
+          }
+        },
+        "unreferenced": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^evr-\\d+$"
+          }
+        }
+      },
+      "required": [
+        "total",
+        "passed",
+        "skipped",
+        "failed",
+        "unknown",
+        "unreferenced"
+      ],
+      "description": "EVR summary at completion"
+    },
+    "evr_required_final": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "evr_id": {
+            "type": "string",
+            "pattern": "^evr-\\d+$"
+          },
+          "reason": {
+            "type": "string",
+            "enum": ["need_reason_for_skip", "status_unknown", "failed"]
+          }
+        },
+        "required": ["evr_id", "reason"]
+      },
+      "description": "EVRs that need final verification (empty if task can complete)"
+    },
+    "evr_unreferenced": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "evr_id": {
+            "type": "string",
+            "pattern": "^evr-\\d+$"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason why EVR is unreferenced"
+          }
+        },
+        "required": ["evr_id", "reason"]
+      },
+      "description": "Unreferenced EVRs with suggestions"
+    },
+    "task_completed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Task completion timestamp"
+    },
+    "generated_docs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Paths to generated documentation files"
+    },
+    "logs_highlights": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ts": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "level": {
+            "type": "string",
+            "enum": ["INFO", "WARN", "ERROR"]
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "TEST",
+              "TASK",
+              "EXCEPTION",
+              "DISCUSSION",
+              "PLAN",
+              "SYSTEM",
+              "HEALTH"
+            ]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "UPDATE",
+              "CREATE",
+              "MODIFY",
+              "SWITCH",
+              "HANDLE",
+              "COMPLETE"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": ["ts", "level", "category", "action", "message"]
+      },
+      "maxItems": 10,
+      "description": "Recent log highlights"
+    }
+  },
+  "required": ["completed"],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "completed": {
+            "const": true
+          }
+        }
+      },
+      "then": {
+        "required": ["evr_summary", "task_completed_at", "logs_highlights"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "completed": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "required": ["evr_required_final"]
+      }
+    }
+  ],
+  "additionalProperties": false
+}

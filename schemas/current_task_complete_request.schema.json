@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://waveforge.dev/schemas/current_task_complete_request.schema.json",
+  "title": "Current Task Complete Request",
+  "description": "Request schema for current_task_complete MCP tool",
+  "type": "object",
+  "properties": {
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "description": "Task completion summary"
+    },
+    "generate_docs": {
+      "type": "boolean",
+      "default": true,
+      "description": "Whether to generate documentation"
+    },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$",
+      "description": "Project ID (optional, overrides default binding)"
+    }
+  },
+  "required": ["summary"],
+  "additionalProperties": false
+}

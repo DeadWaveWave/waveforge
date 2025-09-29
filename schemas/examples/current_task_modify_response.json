@@ -1,0 +1,50 @@
+{
+  "modified": true,
+  "sync_preview": {
+    "applied": true,
+    "changes": [
+      {
+        "type": "structure",
+        "section": "evrs",
+        "field": "expected_results",
+        "old_value": 3,
+        "new_value": 5,
+        "source": "structured"
+      },
+      {
+        "type": "content",
+        "section": "evr-004",
+        "field": "title",
+        "old_value": null,
+        "new_value": "JSON 示例格式正确",
+        "source": "structured"
+      },
+      {
+        "type": "content",
+        "section": "evr-005",
+        "field": "title",
+        "old_value": null,
+        "new_value": "Schema 校验通过",
+        "source": "structured"
+      }
+    ],
+    "conflicts": [],
+    "affected_sections": ["evrs", "evr-004", "evr-005"]
+  },
+  "logs_highlights": [
+    {
+      "ts": "2025-09-29T04:20:30.456Z",
+      "level": "INFO",
+      "category": "TASK",
+      "action": "MODIFY",
+      "message": "添加了 2 个新的 EVR 验证项"
+    },
+    {
+      "ts": "2025-09-29T04:20:30.457Z",
+      "level": "INFO",
+      "category": "TASK",
+      "action": "MODIFY",
+      "message": "面板同步：更新 EVR 结构和内容"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "field": "evr",
+  "content": {
+    "items": [
+      {
+        "evr_id": "evr-004",
+        "title": "JSON 示例格式正确",
+        "verify": [
+          "检查四个接口的 JSON 示例文件",
+          "验证字段名使用 snake_case 格式",
+          "确认数据结构完整性"
+        ],
+        "expect": [
+          "所有 JSON 文件格式正确",
+          "字段名符合 snake_case 规范",
+          "包含必要的示例数据"
+        ],
+        "class": "static"
+      },
+      {
+        "evr_id": "evr-005",
+        "title": "Schema 校验通过",
+        "verify": "使用 JSON Schema 验证示例文件",
+        "expect": "所有示例文件通过对应的 Schema 校验",
+        "class": "runtime"
+      }
+    ]
+  },
+  "reason": "为任务添加新的 EVR 验证项，确保 JSON 示例的质量和格式正确性",
+  "change_type": "plan_adjustment",
+  "project_id": "01K5XNPG6BCJ71GMD9816XCPSF"
+}

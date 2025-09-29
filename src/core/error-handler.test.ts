@@ -10,9 +10,22 @@ import {
   ConcurrencyError,
   NotFoundError,
   SystemError,
+  ProjectError,
+  TaskError,
+  EVRError,
+  SyncError,
+  ParseError,
+  RenderError,
+  StateError,
   ErrorType,
+  createErrorFromCode,
+  isErrorCode,
+  getErrorCode,
+  ERROR_CODE_TO_TYPE,
+  ERROR_CODE_TO_CLASS,
+  ERROR_CODE_MESSAGES,
 } from './error-handler.js';
-import { LogLevel } from '../types/index.js';
+import { LogLevel, ErrorCode } from '../types/index.js';
 
 describe('ErrorHandler', () => {
   let errorHandler: ErrorHandler;
@@ -21,6 +34,113 @@ describe('ErrorHandler', () => {
     // 重置单例实例
     ErrorHandler.resetInstance();
     errorHandler = ErrorHandler.getInstance();
+  });
+
+  describe('面向结果的任务管理系统错误', () => {
+    it('应该正确创建项目错误', () => {
+      const error = new ProjectError('项目不存在', { projectId: 'test' });
+      expect(error.name).toBe('ProjectError');
+      expect(error.type).toBe(ErrorType.ProjectError);
+      expect(error.message).toBe('项目不存在');
+      expect(error.context?.projectId).toBe('test');
+    });
+
+    it('应该正确创建任务错误', () => {
+      const error = new TaskError('任务未找到', { taskId: 'task-1' });
+      expect(error.name).toBe('TaskError');
+      expect(error.type).toBe(ErrorType.TaskError);
+      expect(error.message).toBe('任务未找到');
+    });
+
+    it('应该正确创建 EVR 错误', () => {
+      const error = new EVRError('EVR 验证失败', { evrId: 'evr-001' });
+      expect(error.name).toBe('EVRError');
+      expect(error.type).toBe(ErrorType.EVRError);
+      expect(error.message).toBe('EVR 验证失败');
+    });
+
+    it('应该正确创建同步错误', () => {
+      const error = new SyncError('同步冲突', {
+        conflictType: 'etag_mismatch',
+      });
+      expect(error.name).toBe('SyncError');
+      expect(error.type).toBe(ErrorType.SyncError);
+      expect(error.message).toBe('同步冲突');
+    });
+
+    it('应该正确创建解析错误', () => {
+      const error = new ParseError('Markdown 解析失败', { line: 10 });
+      expect(error.name).toBe('ParseError');
+      expect(error.type).toBe(ErrorType.ParseError);
+      expect(error.message).toBe('Markdown 解析失败');
+    });
+
+    it('应该正确创建渲染错误', () => {
+      const error = new RenderError('模板渲染失败', { template: 'task.md' });
+      expect(error.name).toBe('RenderError');
+      expect(error.type).toBe(ErrorType.RenderError);
+      expect(error.message).toBe('模板渲染失败');
+    });
+
+    it('应该正确创建状态错误', () => {
+      const error = new StateError('无效状态转换', {
+        from: 'to_do',
+        to: 'completed',
+      });
+      expect(error.name).toBe('StateError');
+      expect(error.type).toBe(ErrorType.StateError);
+      expect(error.message).toBe('无效状态转换');
+    });
+  });
+
+  describe('错误码处理', () => {
+    it('应该根据错误码创建正确的错误实例', () => {
+      const error = createErrorFromCode(ErrorCode.NO_PROJECT_BOUND);
+      expect(error).toBeInstanceOf(ProjectError);
+      expect(error.message).toBe(
+        '当前连接没有绑定活跃项目，请先调用 project_bind'
+      );
+      expect(error.context?.errorCode).toBe(ErrorCode.NO_PROJECT_BOUND);
+    });
+
+    it('应该支持自定义错误消息', () => {
+      const customMessage = '自定义项目错误消息';
+      const error = createErrorFromCode(ErrorCode.INVALID_ROOT, customMessage);
+      expect(error.message).toBe(customMessage);
+      expect(error.context?.errorCode).toBe(ErrorCode.INVALID_ROOT);
+    });
+
+    it('应该正确检查错误码', () => {
+      const error = createErrorFromCode(ErrorCode.EVR_NOT_READY);
+      expect(isErrorCode(error, ErrorCode.EVR_NOT_READY)).toBe(true);
+      expect(isErrorCode(error, ErrorCode.NO_ACTIVE_TASK)).toBe(false);
+    });
+
+    it('应该正确提取错误码', () => {
+      const error = createErrorFromCode(ErrorCode.SYNC_CONFLICT);
+      expect(getErrorCode(error)).toBe(ErrorCode.SYNC_CONFLICT);
+
+      const regularError = new Error('普通错误');
+      expect(getErrorCode(regularError)).toBe(null);
+    });
+
+    it('应该为所有错误码提供映射', () => {
+      const errorCodes = Object.values(ErrorCode);
+
+      errorCodes.forEach((code) => {
+        expect(ERROR_CODE_TO_TYPE).toHaveProperty(code);
+        expect(ERROR_CODE_TO_CLASS).toHaveProperty(code);
+        expect(ERROR_CODE_MESSAGES).toHaveProperty(code);
+      });
+    });
+
+    it('应该正确处理错误码对应的用户消息', () => {
+      const error = createErrorFromCode(ErrorCode.NO_PROJECT_BOUND);
+      const userMessage = errorHandler.formatUserMessage(error);
+      expect(userMessage).toBe(
+        '当前连接没有绑定活跃项目，请先调用 project_bind'
+      );
+    });
   });
 
   describe('错误处理', () => {

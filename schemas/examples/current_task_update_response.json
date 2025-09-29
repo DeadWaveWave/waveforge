@@ -1,0 +1,45 @@
+{
+  "updated": true,
+  "evr_for_node": ["evr-004", "evr-005"],
+  "evr_pending": false,
+  "evr_for_plan": [],
+  "sync_preview": {
+    "applied": true,
+    "changes": [
+      {
+        "type": "content",
+        "section": "plan-5",
+        "field": "status",
+        "old_value": "in_progress",
+        "new_value": "completed",
+        "source": "structured"
+      },
+      {
+        "type": "content",
+        "section": "plan-5",
+        "field": "notes",
+        "old_value": null,
+        "new_value": "已成功输出四个接口的 JSON 示例文件",
+        "source": "structured"
+      }
+    ],
+    "conflicts": [],
+    "affected_sections": ["plan-5"]
+  },
+  "logs_highlights": [
+    {
+      "ts": "2025-09-29T04:20:15.123Z",
+      "level": "INFO",
+      "category": "PLAN",
+      "action": "UPDATE",
+      "message": "计划 5 已完成：输出四个接口的 JSON 示例"
+    },
+    {
+      "ts": "2025-09-29T04:20:15.124Z",
+      "level": "INFO",
+      "category": "TASK",
+      "action": "MODIFY",
+      "message": "面板同步：更新计划状态和备注"
+    }
+  ]
+}
