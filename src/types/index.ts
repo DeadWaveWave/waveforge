@@ -1267,3 +1267,273 @@ export interface StaticValidationResult {
   /** 验证消息 */
   message?: string;
 }
+// ============================================================================
+// 面板解析器相关类型定义
+// ============================================================================
+
+/**
+ * 复选框状态映射
+ */
+export enum CheckboxState {
+  /** 待办 - [ ] */
+  ToDo = 'to_do',
+  /** 进行中 - [-] */
+  InProgress = 'in_progress',
+  /** 已完成 - [x] */
+  Completed = 'completed',
+  /** 阻塞 - [!] */
+  Blocked = 'blocked',
+}
+
+/**
+ * 解析的面板数据结构
+ */
+export interface ParsedPanel {
+  /** 任务标题 */
+  title: string;
+  /** 需求列表 */
+  requirements: string[];
+  /** 问题列表 */
+  issues: string[];
+  /** 提示列表 */
+  hints: string[];
+  /** 解析的计划列表 */
+  plans: ParsedPlan[];
+  /** 解析的 EVR 列表 */
+  evrs: ParsedEVR[];
+  /** 解析的日志列表 */
+  logs: ParsedLog[];
+  /** 面板元数据 */
+  metadata: PanelMetadata;
+}
+
+/**
+ * 解析的计划数据结构
+ */
+export interface ParsedPlan {
+  /** 计划 ID（从锚点或序号推导） */
+  id: string;
+  /** 计划描述文本 */
+  text: string;
+  /** 计划状态 */
+  status: CheckboxState;
+  /** 计划级提示 */
+  hints: string[];
+  /** 上下文标签 */
+  contextTags: ContextTag[];
+  /** EVR 绑定 */
+  evrBindings: string[];
+  /** 解析的步骤列表 */
+  steps: ParsedStep[];
+  /** 稳定锚点 */
+  anchor?: string;
+  /** 序号路径（如 "1", "2.1" 等） */
+  numberPath?: string;
+}
+
+/**
+ * 解析的步骤数据结构
+ */
+export interface ParsedStep {
+  /** 步骤 ID（从锚点或序号推导） */
+  id: string;
+  /** 步骤描述文本 */
+  text: string;
+  /** 步骤状态 */
+  status: CheckboxState;
+  /** 步骤级提示 */
+  hints: string[];
+  /** 上下文标签 */
+  contextTags: ContextTag[];
+  /** EVR 引用 */
+  usesEVR: string[];
+  /** 稳定锚点 */
+  anchor?: string;
+  /** 序号路径（如 "1.1", "2.3" 等） */
+  numberPath?: string;
+}
+
+/**
+ * 解析的 EVR 数据结构
+ */
+export interface ParsedEVR {
+  /** EVR ID */
+  id: string;
+  /** EVR 标题 */
+  title: string;
+  /** 验证方法 */
+  verify: string | string[];
+  /** 预期结果 */
+  expect: string | string[];
+  /** EVR 状态 */
+  status: EVRStatus;
+  /** EVR 类别 */
+  class?: EVRClass;
+  /** 最后运行时间 */
+  lastRun?: string;
+  /** 备注信息 */
+  notes?: string;
+  /** 证据链接 */
+  proof?: string;
+  /** 验证运行记录 */
+  runs: VerificationRun[];
+  /** 稳定锚点 */
+  anchor?: string;
+}
+
+/**
+ * 解析的日志数据结构
+ */
+export interface ParsedLog {
+  /** 时间戳 */
+  timestamp: string;
+  /** 日志级别 */
+  level: LogLevel;
+  /** 内容类别 */
+  category: LogCategory;
+  /** 操作类别 */
+  action: LogAction;
+  /** 日志消息 */
+  message: string;
+  /** AI 提供的详细说明 */
+  aiNotes?: string;
+  /** 详细信息 */
+  details?: Record<string, any>;
+}
+
+/**
+ * 面板元数据
+ */
+export interface PanelMetadata {
+  /** 解析时间戳 */
+  parsedAt: string;
+  /** 面板版本/ETag */
+  version?: string;
+  /** 解析器版本 */
+  parserVersion: string;
+  /** 解析统计 */
+  stats: {
+    /** 总计划数 */
+    totalPlans: number;
+    /** 总步骤数 */
+    totalSteps: number;
+    /** 总 EVR 数 */
+    totalEVRs: number;
+    /** 解析错误数 */
+    parseErrors: number;
+    /** 容错修复数 */
+    toleranceFixCount: number;
+  };
+  /** 解析错误列表 */
+  parseErrors: PanelParseError[];
+  /** 容错修复记录 */
+  toleranceFixes: ToleranceFix[];
+}
+
+/**
+ * 解析错误信息
+ */
+export interface PanelParseError {
+  /** 错误类型 */
+  type:
+    | 'missing_anchor'
+    | 'invalid_checkbox'
+    | 'malformed_section'
+    | 'duplicate_id';
+  /** 错误消息 */
+  message: string;
+  /** 错误位置（行号） */
+  line?: number;
+  /** 错误上下文 */
+  context?: string;
+  /** 修复建议 */
+  suggestion?: string;
+}
+
+/**
+ * 容错修复记录
+ */
+export interface ToleranceFix {
+  /** 修复类型 */
+  type:
+    | 'normalize_checkbox'
+    | 'generate_anchor'
+    | 'fix_indentation'
+    | 'add_missing_line';
+  /** 修复描述 */
+  description: string;
+  /** 修复位置（行号） */
+  line?: number;
+  /** 原始内容 */
+  original?: string;
+  /** 修复后内容 */
+  fixed?: string;
+}
+
+/**
+ * 面板解析选项
+ */
+export interface PanelParseOptions {
+  /** 是否启用容错解析 */
+  enableTolerance: boolean;
+  /** 是否自动生成缺失的锚点 */
+  generateMissingAnchors: boolean;
+  /** 是否标准化复选框格式 */
+  normalizeCheckboxes: boolean;
+  /** 是否修复缩进问题 */
+  fixIndentation: boolean;
+  /** 最大容错修复次数 */
+  maxToleranceFixes: number;
+  /** 解析器版本 */
+  parserVersion: string;
+}
+
+/**
+ * 面板区域类型
+ */
+export enum PanelSection {
+  /** 标题区域 */
+  Title = 'title',
+  /** 需求区域 */
+  Requirements = 'requirements',
+  /** 问题区域 */
+  Issues = 'issues',
+  /** 提示区域 */
+  Hints = 'hints',
+  /** 计划区域 */
+  Plans = 'plans',
+  /** EVR 区域 */
+  EVRs = 'evrs',
+  /** 日志区域 */
+  Logs = 'logs',
+}
+
+/**
+ * 锚点匹配结果
+ */
+export interface AnchorMatch {
+  /** 锚点 ID */
+  id: string;
+  /** 锚点类型 */
+  type: 'plan' | 'step' | 'evr';
+  /** 匹配的行号 */
+  line: number;
+  /** 原始锚点文本 */
+  raw: string;
+}
+
+/**
+ * 序号路径匹配结果
+ */
+export interface NumberPathMatch {
+  /** 序号路径（如 "1", "2.1" 等） */
+  path: string;
+  /** 匹配的行号 */
+  line: number;
+  /** 层级深度 */
+  depth: number;
+  /** 是否为计划级（深度为1） */
+  isPlan: boolean;
+  /** 是否为步骤级（深度大于1） */
+  isStep: boolean;
+}

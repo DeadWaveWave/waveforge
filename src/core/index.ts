@@ -10,3 +10,9 @@ export {
 export { ProjectRootManager } from './project-root-manager.js';
 export { logger } from './logger.js';
 export { ErrorHandler } from './error-handler.js';
+export { PanelParser, createPanelParser } from './panel-parser.js';
+export {
+  InMemoryPanelFS,
+  createInMemoryPanelFS,
+  type FileStats,
+} from './in-memory-panel-fs.js';
