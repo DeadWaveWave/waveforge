@@ -1579,3 +1579,121 @@ export interface TaskData {
   /** 区域指纹 */
   sectionFingerprints?: SectionFingerprints;
 }
+
+// ============================================================================
+// 项目连接管理系统 - 新增类型定义
+// ============================================================================
+
+/**
+ * 项目连接参数接口
+ */
+export interface ConnectParams {
+  /** 绝对路径，优先级最高 */
+  root?: string;
+  /** 项目标识符 */
+  slug?: string;
+  /** 仓库地址 */
+  repo?: string;
+}
+
+/**
+ * 项目连接结果接口
+ */
+export interface ConnectionResult {
+  /** 是否连接成功 */
+  connected: boolean;
+  /** 连接的项目信息 */
+  project?: ProjectInfo;
+  /** 错误码 */
+  error?: ErrorCode;
+  /** 候选项目列表（当有多个匹配时） */
+  candidates?: ProjectInfo[];
+  /** 错误消息 */
+  message?: string;
+}
+
+/**
+ * 连接状态接口
+ */
+export interface ConnectionStatus {
+  /** 是否已连接 */
+  connected: boolean;
+  /** 当前连接的项目信息 */
+  project?: ProjectInfo;
+  /** 连接时间 */
+  connectedAt?: string;
+  /** 会话ID */
+  sessionId?: string;
+}
+
+/**
+ * 增强的项目信息接口（用于连接管理）
+ */
+export interface EnhancedProjectInfo extends ProjectInfo {
+  /** 项目根目录路径 */
+  root: string;
+  /** 仓库地址（可选） */
+  repo?: string;
+  /** 活动任务摘要 */
+  activeTask?: TaskSummary;
+  /** 最近任务列表 */
+  recentTasks: TaskSummary[];
+  /** 最后访问时间 */
+  lastAccessed?: string;
+}
+
+/**
+ * 项目解析结果接口
+ */
+export interface ProjectResolveResult {
+  /** 是否找到项目 */
+  found: boolean;
+  /** 匹配的项目列表 */
+  projects: EnhancedProjectInfo[];
+  /** 解析方法 */
+  method: 'root' | 'slug' | 'repo';
+  /** 搜索参数 */
+  searchParam: string;
+  /** 错误信息 */
+  error?: string;
+}
+
+/**
+ * 会话绑定信息接口
+ */
+export interface SessionBinding {
+  /** 会话ID */
+  sessionId: string;
+  /** 绑定的项目ID */
+  projectId: string;
+  /** 绑定时间 */
+  boundAt: string;
+  /** 最后活动时间 */
+  lastActivity: string;
+  /** 绑定状态 */
+  status: 'active' | 'inactive' | 'expired';
+}
+
+/**
+ * 项目连接管理器状态接口
+ */
+export interface ProjectRegistryState {
+  /** 当前会话绑定 */
+  currentBinding?: SessionBinding;
+  /** 连接历史 */
+  connectionHistory: Array<{
+    projectId: string;
+    connectedAt: string;
+    disconnectedAt?: string;
+    duration?: number;
+  }>;
+  /** 统计信息 */
+  stats: {
+    /** 总连接次数 */
+    totalConnections: number;
+    /** 唯一项目数 */
+    uniqueProjects: number;
+    /** 平均连接时长（毫秒） */
+    averageConnectionDuration: number;
+  };
+}
