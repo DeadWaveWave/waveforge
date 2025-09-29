@@ -196,7 +196,10 @@ export class PanelParser {
       } else if (currentPlan && trimmedLine.startsWith('>')) {
         // 这是提示信息
         const hint = trimmedLine.substring(1).trim();
-        if (indentLevel <= currentIndentLevel + 2) {
+        // 判断提示属于计划级还是步骤级
+        // 计划级提示：缩进级别 <= 计划缩进级别 + 1
+        // 步骤级提示：缩进级别 > 计划缩进级别 + 1
+        if (indentLevel <= currentIndentLevel + 1) {
           currentPlan.hints.push(hint);
         } else if (currentPlan.steps.length > 0) {
           const lastStep = currentPlan.steps[currentPlan.steps.length - 1];
@@ -206,7 +209,10 @@ export class PanelParser {
         // 这是标签化条目
         const tag = this.parseContextTag(trimmedLine);
         if (tag) {
-          if (indentLevel <= currentIndentLevel + 2) {
+          // 判断标签属于计划级还是步骤级
+          // 计划级标签：缩进级别 <= 计划缩进级别 + 1
+          // 步骤级标签：缩进级别 > 计划缩进级别 + 1
+          if (indentLevel <= currentIndentLevel + 1) {
             currentPlan.contextTags.push(tag);
             if (tag.type === 'evr') {
               currentPlan.evrBindings.push(tag.value);
@@ -276,52 +282,83 @@ export class PanelParser {
 
       // 解析 EVR 字段
       if (
+        trimmedLine.startsWith('**Verify:**') ||
         trimmedLine.startsWith('**verify:**') ||
         trimmedLine.startsWith('**验证:**')
       ) {
         this.finalizeEVRField(currentEVR, currentField, fieldContent);
         currentField = 'verify';
         fieldContent = [];
-        const content = trimmedLine.replace(/^\*\*(verify|验证):\*\*\s*/, '');
+        const content = trimmedLine.replace(
+          /^\*\*(Verify|verify|验证):\*\*\s*/,
+          ''
+        );
         if (content) fieldContent.push(content);
       } else if (
+        trimmedLine.startsWith('**Expect:**') ||
         trimmedLine.startsWith('**expect:**') ||
         trimmedLine.startsWith('**预期:**')
       ) {
         this.finalizeEVRField(currentEVR, currentField, fieldContent);
         currentField = 'expect';
         fieldContent = [];
-        const content = trimmedLine.replace(/^\*\*(expect|预期):\*\*\s*/, '');
+        const content = trimmedLine.replace(
+          /^\*\*(Expect|expect|预期):\*\*\s*/,
+          ''
+        );
         if (content) fieldContent.push(content);
       } else if (
+        trimmedLine.startsWith('- Status:') ||
         trimmedLine.startsWith('**status:**') ||
         trimmedLine.startsWith('**状态:**')
       ) {
         this.finalizeEVRField(currentEVR, currentField, fieldContent);
         currentField = null;
         const statusText = trimmedLine.replace(
-          /^\*\*(status|状态):\*\*\s*/,
+          /^(-\s*Status:\s*|\*\*(status|状态):\*\*\s*)/,
           ''
         );
         currentEVR.status = this.parseEVRStatus(statusText);
       } else if (
+        trimmedLine.startsWith('- Class:') ||
         trimmedLine.startsWith('**class:**') ||
         trimmedLine.startsWith('**类别:**')
       ) {
-        const classText = trimmedLine.replace(/^\*\*(class|类别):\*\*\s*/, '');
+        const classText = trimmedLine.replace(
+          /^(-\s*Class:\s*|\*\*(class|类别):\*\*\s*)/,
+          ''
+        );
         currentEVR.class = this.parseEVRClass(classText);
       } else if (
+        trimmedLine.startsWith('- Notes:') ||
         trimmedLine.startsWith('**notes:**') ||
         trimmedLine.startsWith('**备注:**')
       ) {
-        const notes = trimmedLine.replace(/^\*\*(notes|备注):\*\*\s*/, '');
+        const notes = trimmedLine.replace(
+          /^(-\s*Notes:\s*|\*\*(notes|备注):\*\*\s*)/,
+          ''
+        );
         currentEVR.notes = notes;
       } else if (
+        trimmedLine.startsWith('- Proof:') ||
         trimmedLine.startsWith('**proof:**') ||
         trimmedLine.startsWith('**证据:**')
       ) {
-        const proof = trimmedLine.replace(/^\*\*(proof|证据):\*\*\s*/, '');
+        const proof = trimmedLine.replace(
+          /^(-\s*Proof:\s*|\*\*(proof|证据):\*\*\s*)/,
+          ''
+        );
         currentEVR.proof = proof;
+      } else if (
+        trimmedLine.startsWith('- Last Run:') ||
+        trimmedLine.startsWith('**lastRun:**') ||
+        trimmedLine.startsWith('**最后运行:**')
+      ) {
+        const lastRun = trimmedLine.replace(
+          /^(-\s*Last Run:\s*|\*\*(lastRun|最后运行):\*\*\s*)/,
+          ''
+        );
+        currentEVR.lastRun = lastRun;
       } else if (
         currentField &&
         (trimmedLine.startsWith('-') || trimmedLine.startsWith('*'))
@@ -571,20 +608,30 @@ export class PanelParser {
     const trimmedLine = line.trim();
     const lowerLine = trimmedLine.toLowerCase();
 
+    // 排除明显的内容行
+    if (
+      trimmedLine.startsWith('-') ||
+      trimmedLine.startsWith('*') ||
+      trimmedLine.startsWith('>') ||
+      trimmedLine.startsWith('[') ||
+      /^\d+\./.test(trimmedLine) // 排除编号列表
+    ) {
+      return false;
+    }
+
     // 更严格的判断：
     // 1. 行长度不能太长（标题通常比较短）
     if (trimmedLine.length > 20) {
       return false;
     }
 
-    // 2. 必须以关键词开头或者关键词占主要部分
+    // 2. 必须完全匹配关键词或者非常接近
     return sectionKeywords.some((keyword) => {
       const lowerKeyword = keyword.toLowerCase();
       return (
         lowerLine === lowerKeyword ||
-        lowerLine.startsWith(lowerKeyword) ||
-        (lowerLine.includes(lowerKeyword) &&
-          trimmedLine.length <= keyword.length + 5)
+        (lowerLine.startsWith(lowerKeyword) &&
+          trimmedLine.length <= keyword.length + 3)
       );
     });
   }
@@ -1066,7 +1113,11 @@ export class PanelParser {
     for (const line of reqLines) {
       const trimmedLine = line.trim();
       if (trimmedLine && !trimmedLine.startsWith('#')) {
-        requirements.push(trimmedLine);
+        if (trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
+          requirements.push(trimmedLine.replace(/^[-*]\s*/, ''));
+        } else {
+          requirements.push(trimmedLine);
+        }
       }
     }
 
@@ -1083,7 +1134,11 @@ export class PanelParser {
     for (const line of issueLines) {
       const trimmedLine = line.trim();
       if (trimmedLine && !trimmedLine.startsWith('#')) {
-        issues.push(trimmedLine);
+        if (trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
+          issues.push(trimmedLine.replace(/^[-*]\s*/, ''));
+        } else {
+          issues.push(trimmedLine);
+        }
       }
     }
 
@@ -1220,7 +1275,7 @@ export class PanelParser {
       id = this.generateStableId('plan', undefined, undefined, lineNumber);
     }
 
-    const text = checkboxMatch.text.replace(/<!--.*?-->/, '').trim();
+    const text = checkboxMatch.text.replace(/<!--.*?-->/g, '').trim();
 
     return {
       id,
@@ -1321,7 +1376,7 @@ export class PanelParser {
       id = this.generateStableId('step', undefined, undefined, lineNumber);
     }
 
-    const text = checkboxMatch.text.replace(/<!--.*?-->/, '').trim();
+    const text = checkboxMatch.text.replace(/<!--.*?-->/g, '').trim();
 
     return {
       id,
