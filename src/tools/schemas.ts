@@ -215,8 +215,9 @@ export const CurrentTaskUpdateSchema = {
     properties: {
       update_type: {
         type: 'string' as const,
-        enum: ['plan', 'step'],
-        description: '更新类型：plan=计划级别，step=步骤级别',
+        enum: ['plan', 'step', 'evr'],
+        description:
+          '更新类型：plan=计划级别，step=步骤级别，evr=EVR运行态更新',
       },
       plan_id: {
         type: 'string' as const,
@@ -245,8 +246,50 @@ export const CurrentTaskUpdateSchema = {
         type: 'string' as const,
         description: '项目ID（可选，覆盖默认绑定）',
       },
+      evr: {
+        type: 'object' as const,
+        description: 'EVR更新专用字段（update_type=evr时使用）',
+        properties: {
+          items: {
+            type: 'array' as const,
+            description: 'EVR更新项目列表',
+            items: {
+              type: 'object' as const,
+              properties: {
+                evr_id: {
+                  type: 'string' as const,
+                  description: 'EVR唯一标识',
+                },
+                status: {
+                  type: 'string' as const,
+                  enum: ['pass', 'fail', 'skip', 'unknown'],
+                  description: 'EVR状态',
+                },
+                last_run: {
+                  type: 'string' as const,
+                  description: '最后运行时间（ISO 8601格式）',
+                },
+                notes: {
+                  type: 'string' as const,
+                  description: '运行备注',
+                  maxLength: 1000,
+                },
+                proof: {
+                  type: 'string' as const,
+                  description: '运行证据链接',
+                  maxLength: 500,
+                },
+              },
+              required: ['evr_id', 'status', 'last_run'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['items'],
+        additionalProperties: false,
+      },
     },
-    required: ['update_type', 'status'],
+    required: ['update_type'],
     additionalProperties: false,
   },
 };

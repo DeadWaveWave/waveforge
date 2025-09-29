@@ -104,6 +104,7 @@ describe('Schema 定义验证', () => {
       expect(schema.inputSchema.properties.update_type.enum).toEqual([
         'plan',
         'step',
+        'evr',
       ]);
       expect(schema.inputSchema.properties.status.enum).toEqual([
         'to_do',

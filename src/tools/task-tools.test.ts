@@ -683,14 +683,14 @@ describe('CurrentTaskUpdateTool', () => {
           properties: {
             update_type: expect.objectContaining({
               type: 'string',
-              enum: ['plan', 'step'],
+              enum: ['plan', 'step', 'evr'],
             }),
             status: expect.objectContaining({
               type: 'string',
               enum: ['to_do', 'in_progress', 'completed', 'blocked'],
             }),
           },
-          required: ['update_type', 'status'],
+          required: ['update_type'],
           additionalProperties: false,
         },
       });

@@ -10,6 +10,7 @@ import { ulid } from 'ulid';
 import { logger } from './logger.js';
 import { MultiTaskDirectoryManager } from './multi-task-directory-manager.js';
 import { DataMigrationTool } from './data-migration-tool.js';
+import { EVRValidator, createEVRValidator } from './evr-validator.js';
 import {
   TaskStatus,
   LogLevel,
@@ -50,13 +51,22 @@ export interface TaskInitResult {
  * 任务状态更新参数接口
  */
 export interface TaskUpdateParams {
-  update_type: 'plan' | 'step';
+  update_type: 'plan' | 'step' | 'evr';
   plan_id?: string;
   step_id?: string;
-  status: TaskStatus;
+  status?: TaskStatus;
   evidence?: string;
   notes?: string;
   project_id?: string;
+  evr?: {
+    items: Array<{
+      evr_id: string;
+      status: 'pass' | 'fail' | 'skip' | 'unknown';
+      last_run: string;
+      notes?: string;
+      proof?: string;
+    }>;
+  };
 }
 
 /**
@@ -74,6 +84,7 @@ export interface TaskUpdateResult {
     plan?: string[];
     step?: string[];
   };
+  logs_highlights?: TaskLog[];
 }
 
 /**
@@ -122,6 +133,7 @@ export class TaskManager {
   private projectManager?: import('./project-manager.js').ProjectManager;
   private multiTaskDirectoryManager: MultiTaskDirectoryManager;
   private dataMigrationTool: DataMigrationTool;
+  private evrValidator: EVRValidator;
   private migrationChecked: boolean = false;
 
   constructor(
@@ -139,6 +151,7 @@ export class TaskManager {
       this.docsPath
     );
     this.dataMigrationTool = new DataMigrationTool(this.docsPath);
+    this.evrValidator = createEVRValidator();
   }
 
   getDocsPath(): string {
@@ -347,8 +360,10 @@ export class TaskManager {
 
       if (params.update_type === 'plan') {
         result = await this.updatePlanStatus(task, params, timestamp);
-      } else {
+      } else if (params.update_type === 'step') {
         result = await this.updateStepStatus(task, params, timestamp);
+      } else if (params.update_type === 'evr') {
+        result = await this.updateEVRStatus(task, params, timestamp);
       }
 
       task.updated_at = timestamp;
@@ -893,11 +908,28 @@ export class TaskManager {
   }
 
   private validateUpdateParams(params: TaskUpdateParams): void {
-    if (!['plan', 'step'].includes(params.update_type)) {
+    if (!['plan', 'step', 'evr'].includes(params.update_type)) {
       throw new Error('无效的更新类型');
     }
 
-    if (!Object.values(TaskStatus).includes(params.status)) {
+    if (params.update_type === 'evr') {
+      if (!params.evr || !params.evr.items || params.evr.items.length === 0) {
+        throw new Error('EVR更新必须提供evr.items');
+      }
+
+      for (const item of params.evr.items) {
+        if (!item.evr_id || !item.status || !item.last_run) {
+          throw new Error('EVR更新项目必须包含evr_id、status和last_run');
+        }
+
+        if (!['pass', 'fail', 'skip', 'unknown'].includes(item.status)) {
+          throw new Error('无效的EVR状态');
+        }
+      }
+      return; // EVR更新不需要检查其他字段
+    }
+
+    if (!params.status || !Object.values(TaskStatus).includes(params.status)) {
       throw new Error('无效的任务状态');
     }
 
@@ -935,7 +967,9 @@ export class TaskManager {
       throw new Error('状态转换无效：不能从阻塞状态直接转换到完成状态');
     }
 
-    plan.status = params.status;
+    if (params.status) {
+      plan.status = params.status;
+    }
 
     if (params.evidence) {
       plan.evidence = params.evidence;
@@ -1034,7 +1068,9 @@ export class TaskManager {
       throw new Error('指定的步骤不存在');
     }
 
-    targetStep.status = params.status;
+    if (params.status) {
+      targetStep.status = params.status;
+    }
 
     if (params.evidence) {
       targetStep.evidence = params.evidence;
@@ -1065,6 +1101,104 @@ export class TaskManager {
     task.logs.push(log);
 
     return this.handleStepAdvancement(task, targetPlan, targetStep, timestamp);
+  }
+
+  /**
+   * 更新 EVR 状态
+   */
+  private async updateEVRStatus(
+    task: CurrentTask,
+    params: TaskUpdateParams,
+    timestamp: string
+  ): Promise<TaskUpdateResult> {
+    if (!params.evr || !params.evr.items) {
+      throw new Error('EVR更新参数无效');
+    }
+
+    // 确保任务有 expectedResults 字段
+    if (!task.expectedResults) {
+      task.expectedResults = [];
+    }
+
+    const updatedEVRs: string[] = [];
+    const logsHighlights: TaskLog[] = [];
+
+    // 处理每个 EVR 更新项
+    for (const item of params.evr.items) {
+      // 查找现有的 EVR
+      let existingEVR = task.expectedResults.find(
+        (evr) => evr.id === item.evr_id
+      );
+
+      if (!existingEVR) {
+        // 如果 EVR 不存在，创建一个新的
+        existingEVR = {
+          id: item.evr_id,
+          title: `EVR ${item.evr_id}`,
+          verify: '',
+          expect: '',
+          status: item.status as any,
+          referencedBy: [],
+          runs: [],
+        };
+        task.expectedResults.push(existingEVR);
+      }
+
+      // 使用 EVRValidator 跟踪验证运行
+      this.evrValidator.trackVerificationRun(existingEVR, {
+        status: item.status as any,
+        by: 'ai', // 可以根据实际情况调整
+        notes: item.notes,
+        proof: item.proof,
+      });
+
+      updatedEVRs.push(item.evr_id);
+
+      // 生成高亮日志
+      const highlightCategory =
+        item.status === 'pass'
+          ? 'VERIFIED'
+          : item.status === 'fail'
+            ? 'FAILED'
+            : 'TEST';
+
+      const highlightLog: TaskLog = {
+        timestamp,
+        level: LogLevel.Info,
+        category: LogCategory.Test,
+        action: LogAction.Update,
+        message: `EVR ${item.evr_id}: ${highlightCategory}`,
+        ai_notes: item.notes,
+        details: {
+          evr_id: item.evr_id,
+          status: item.status,
+          proof: item.proof,
+        },
+      };
+
+      task.logs.push(highlightLog);
+      logsHighlights.push(highlightLog);
+    }
+
+    // 记录 EVR 更新操作日志
+    const operationLog: TaskLog = {
+      timestamp,
+      level: LogLevel.Info,
+      category: LogCategory.Task,
+      action: LogAction.Update,
+      message: 'EVR 运行态更新完成',
+      details: {
+        updated_evrs: updatedEVRs,
+        total_updates: params.evr.items.length,
+      },
+    };
+    task.logs.push(operationLog);
+
+    return {
+      success: true,
+      current_plan_id: task.current_plan_id,
+      logs_highlights: logsHighlights,
+    };
   }
 
   private handleStepAdvancement(

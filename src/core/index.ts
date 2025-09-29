@@ -17,3 +17,8 @@ export {
   createInMemoryPanelFS,
   type FileStats,
 } from './in-memory-panel-fs.js';
+export {
+  EVRValidator,
+  createEVRValidator,
+  type EVRValidatorOptions,
+} from './evr-validator.js';

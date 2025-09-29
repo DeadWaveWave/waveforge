@@ -663,6 +663,8 @@ export interface CurrentTask {
   current_step_details?: string;
   /** 任务日志 */
   logs: TaskLog[];
+  /** 预期可见结果列表 */
+  expectedResults?: ExpectedResult[];
   /** 可溯源信息（可选） */
   provenance?: {
     git?: {

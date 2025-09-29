@@ -186,6 +186,9 @@ export class CurrentTaskUpdateTool extends BaseTaskTool {
       if (params.update_type === 'step' && !params.step_id) {
         throw new ValidationError('step级别更新需要提供step_id');
       }
+      if (params.update_type === 'evr' && !params.evr) {
+        throw new ValidationError('EVR更新需要提供evr字段');
+      }
       if (['completed', 'blocked'].includes(params.status) && !params.notes) {
         throw new ValidationError('完成或阻塞状态需要提供notes说明');
       }
@@ -210,6 +213,7 @@ export class CurrentTaskUpdateTool extends BaseTaskTool {
         evidence: params.evidence,
         notes: params.notes,
         project_id: params.project_id,
+        evr: params.evr,
       });
 
       this.logOperation(
@@ -229,6 +233,7 @@ export class CurrentTaskUpdateTool extends BaseTaskTool {
         steps_required: result.steps_required,
         started_new_plan: result.started_new_plan,
         hints: result.hints,
+        logs_highlights: result.logs_highlights,
       });
     } catch (error) {
       this.logOperation(
