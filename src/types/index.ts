@@ -1603,11 +1603,11 @@ export interface ConnectionResult {
   /** 是否连接成功 */
   connected: boolean;
   /** 连接的项目信息 */
-  project?: ProjectInfo;
+  project?: ProjectInfo & { root: string };
   /** 错误码 */
   error?: ErrorCode;
   /** 候选项目列表（当有多个匹配时） */
-  candidates?: ProjectInfo[];
+  candidates?: (ProjectInfo & { root: string })[];
   /** 错误消息 */
   message?: string;
 }

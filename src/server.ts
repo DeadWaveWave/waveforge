@@ -14,11 +14,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { errorHandler, ValidationError } from './core/error-handler.js';
 import { logger } from './core/logger.js';
-import {
-  LogCategory,
-  LogAction,
-  type ProjectBindParams,
-} from './types/index.js';
+import { LogCategory, LogAction } from './types/index.js';
 import { HealthTool, PingTool } from './tools/index.js';
 import {
   CurrentTaskInitTool,
@@ -35,6 +31,11 @@ import { ProjectManager } from './core/project-manager.js';
 import { toolRegistry } from './core/tool-registry.js';
 import { TaskManager } from './core/task-manager.js';
 import { ProjectBindTool, ProjectInfoTool } from './tools/project-tools.js';
+import {
+  ProjectInfoTool as HandshakeProjectInfoTool,
+  ConnectProjectTool,
+  HandshakeChecker,
+} from './tools/handshake-tools.js';
 import { ulid } from 'ulid';
 import * as path from 'path';
 
@@ -297,57 +298,59 @@ class WaveForgeServer {
    * 注册项目管理工具
    */
   private registerProjectManagementTools(): void {
-    // 创建项目管理工具实例
-    const projectBindTool = new ProjectBindTool(this.projectManager);
-    const projectInfoTool = new ProjectInfoTool(this.projectManager);
+    // 创建握手工具实例
+    const handshakeProjectInfoTool = new HandshakeProjectInfoTool(
+      this.projectManager,
+      this.taskManager
+    );
+    const connectProjectTool = new ConnectProjectTool(
+      this.projectManager,
+      this.taskManager
+    );
 
-    // 注册 connect_project 工具（主要实现）
-    toolRegistry.registerTool({
-      name: 'connect_project',
-      handler: {
-        getDefinition: () => ({
-          name: 'connect_project',
-          description: '连接项目到当前会话，提供稳定项目标识',
-          inputSchema: {
-            type: 'object' as const,
-            properties: {
-              project_path: {
-                type: 'string' as const,
-                description: '项目路径',
-              },
-            },
-            required: ['project_path'],
-            additionalProperties: false,
-          },
-        }),
-        handle: async (args: any) => {
-          // 处理 connect_project 参数
-          const projectBindParams: ProjectBindParams = {
-            project_path: args?.project_path,
-          };
-          return await projectBindTool.handle(projectBindParams);
-        },
-      },
-      category: 'project',
-      description: '连接项目到当前会话，提供稳定项目标识',
-      enabled: true,
-    });
-
-    // 注册 project_info 工具（完整实现）
+    // 注册 project_info 工具（握手流程入口）
     toolRegistry.registerTool({
       name: 'project_info',
       handler: {
-        getDefinition: () => ProjectInfoTool.getDefinition(),
-        handle: async () => await projectInfoTool.handle(),
+        getDefinition: () => HandshakeProjectInfoTool.getDefinition(),
+        handle: async () => await handshakeProjectInfoTool.handle(),
+      },
+      category: 'handshake',
+      description: '获取当前连接状态和项目信息，握手流程的入口点',
+      enabled: true,
+    });
+
+    // 注册 connect_project 工具（项目连接）
+    toolRegistry.registerTool({
+      name: 'connect_project',
+      handler: {
+        getDefinition: () => ConnectProjectTool.getDefinition(),
+        handle: async (args: any) => await connectProjectTool.handle(args),
+      },
+      category: 'handshake',
+      description: '连接项目到当前会话，支持多种连接方式',
+      enabled: true,
+    });
+
+    // 保留旧的项目管理工具作为兼容性支持
+    const projectBindTool = new ProjectBindTool(this.projectManager);
+    const _legacyProjectInfoTool = new ProjectInfoTool(this.projectManager);
+
+    // 注册 project_bind 工具（兼容性）
+    toolRegistry.registerTool({
+      name: 'project_bind',
+      handler: {
+        getDefinition: () => ProjectBindTool.getDefinition(),
+        handle: async (args: any) => await projectBindTool.handle(args),
       },
       category: 'project',
-      description: '获取当前连接的活跃项目信息',
+      description: '绑定项目到当前连接（兼容性工具）',
       enabled: true,
     });
 
     logger.info(LogCategory.Task, LogAction.Create, '项目管理工具注册完成', {
-      tools: ['connect_project', 'project_info'],
-      primaryTool: 'connect_project',
+      handshakeTools: ['project_info', 'connect_project'],
+      legacyTools: ['project_bind'],
     });
   }
 
@@ -355,93 +358,137 @@ class WaveForgeServer {
    * 注册任务管理工具
    */
   private registerTaskManagementTools(): void {
-    // 注册 current_task_init 工具
+    // 创建握手检查器
+    const handshakeChecker = new HandshakeChecker(
+      this.projectManager,
+      this.taskManager
+    );
+
+    // 注册 current_task_init 工具（需要项目连接）
     toolRegistry.registerTool({
       name: 'current_task_init',
       handler: {
         getDefinition: () => CurrentTaskInitTool.getDefinition(),
         handle: async (args) => {
+          // 检查项目连接状态
+          const connectionCheck =
+            await handshakeChecker.checkProjectConnection();
+          if (connectionCheck) {
+            return connectionCheck;
+          }
+
           const tool = new CurrentTaskInitTool(this.taskManager);
           return await tool.handle(args);
         },
       },
       category: 'task',
-      description: '初始化新的开发任务',
+      description: '初始化新的开发任务（需要先连接项目）',
       enabled: true,
     });
 
-    // 注册 current_task_update 工具
+    // 注册 current_task_update 工具（需要项目连接和活动任务）
     toolRegistry.registerTool({
       name: 'current_task_update',
       handler: {
         getDefinition: () => CurrentTaskUpdateTool.getDefinition(),
         handle: async (args) => {
+          // 检查项目连接和活动任务状态
+          const taskCheck = await handshakeChecker.checkActiveTask();
+          if (taskCheck) {
+            return taskCheck;
+          }
+
           const tool = new CurrentTaskUpdateTool(this.taskManager);
           return await tool.handle(args);
         },
       },
       category: 'task',
-      description: '更新任务状态和进度',
+      description: '更新任务状态和进度（需要先连接项目和创建任务）',
       enabled: true,
     });
 
-    // 注册 current_task_read 工具
+    // 注册 current_task_read 工具（需要项目连接和活动任务）
     toolRegistry.registerTool({
       name: 'current_task_read',
       handler: {
         getDefinition: () => CurrentTaskReadTool.getDefinition(),
         handle: async (args) => {
+          // 检查项目连接和活动任务状态
+          const taskCheck = await handshakeChecker.checkActiveTask();
+          if (taskCheck) {
+            return taskCheck;
+          }
+
           const tool = new CurrentTaskReadTool(this.taskManager);
           return await tool.handle(args);
         },
       },
       category: 'task',
-      description: '读取当前任务完整状态以恢复上下文',
+      description:
+        '读取当前任务完整状态以恢复上下文（需要先连接项目和创建任务）',
       enabled: true,
     });
 
-    // 注册 current_task_modify 工具
+    // 注册 current_task_modify 工具（需要项目连接和活动任务）
     toolRegistry.registerTool({
       name: 'current_task_modify',
       handler: {
         getDefinition: () => CurrentTaskModifyTool.getDefinition(),
         handle: async (args) => {
+          // 检查项目连接和活动任务状态
+          const taskCheck = await handshakeChecker.checkActiveTask();
+          if (taskCheck) {
+            return taskCheck;
+          }
+
           const tool = new CurrentTaskModifyTool(this.taskManager);
           return await tool.handle(args);
         },
       },
       category: 'task',
-      description: '修改任务目标、计划或步骤',
+      description: '修改任务目标、计划或步骤（需要先连接项目和创建任务）',
       enabled: true,
     });
 
-    // 注册 current_task_complete 工具
+    // 注册 current_task_complete 工具（需要项目连接和活动任务）
     toolRegistry.registerTool({
       name: 'current_task_complete',
       handler: {
         getDefinition: () => CurrentTaskCompleteTool.getDefinition(),
         handle: async (args) => {
+          // 检查项目连接和活动任务状态
+          const taskCheck = await handshakeChecker.checkActiveTask();
+          if (taskCheck) {
+            return taskCheck;
+          }
+
           const tool = new CurrentTaskCompleteTool(this.taskManager);
           return await tool.handle(args);
         },
       },
       category: 'task',
-      description: '完成当前任务并生成文档',
+      description: '完成当前任务并生成文档（需要先连接项目和创建任务）',
       enabled: true,
     });
 
-    // 注册 current_task_log 工具
+    // 注册 current_task_log 工具（需要项目连接和活动任务）
     toolRegistry.registerTool({
       name: 'current_task_log',
       handler: {
         getDefinition: () => CurrentTaskLogTool.getDefinition(),
         handle: async (args) => {
+          // 检查项目连接和活动任务状态
+          const taskCheck = await handshakeChecker.checkActiveTask();
+          if (taskCheck) {
+            return taskCheck;
+          }
+
           const tool = new CurrentTaskLogTool(this.taskManager);
           return await tool.handle(args);
         },
       },
       category: 'task',
-      description: '记录非任务状态变更的重要事件',
+      description: '记录非任务状态变更的重要事件（需要先连接项目和创建任务）',
       enabled: true,
     });
 

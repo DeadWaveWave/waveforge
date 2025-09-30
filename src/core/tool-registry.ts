@@ -43,7 +43,7 @@ export interface ToolHandler {
 export interface ToolRegistration {
   name: string;
   handler: ToolHandler;
-  category: 'system' | 'task' | 'project' | 'devlog';
+  category: 'system' | 'task' | 'project' | 'devlog' | 'handshake';
   description: string;
   enabled: boolean;
 }
