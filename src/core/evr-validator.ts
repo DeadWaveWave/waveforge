@@ -56,7 +56,10 @@ export class EVRValidator {
   /**
    * 验证 EVR 就绪性
    */
-  validateEVRReadiness(evrs: ExpectedResult[]): EVRValidationResult {
+  validateEVRReadiness(
+    evrs: ExpectedResult[],
+    options?: { requireSkipReason?: boolean }
+  ): EVRValidationResult {
     const summary = this.generateEVRSummary(evrs);
     const requiredFinal: Array<{
       evr_id: string;
@@ -77,7 +80,7 @@ export class EVRValidator {
         });
       } else if (
         evr.status === EVRStatus.Skip &&
-        this.options.requireSkipReason &&
+        (options?.requireSkipReason ?? this.options.requireSkipReason) &&
         (!evr.notes || evr.notes.trim() === '')
       ) {
         requiredFinal.push({

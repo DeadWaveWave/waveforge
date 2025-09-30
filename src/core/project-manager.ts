@@ -167,6 +167,13 @@ export class ProjectManager {
   }
 
   /**
+   * 获取当前活跃项目信息
+   */
+  getActiveProject(): ActiveProjectBinding | null {
+    return this.activeBinding;
+  }
+
+  /**
    * 检查是否有活跃项目绑定
    */
   hasActiveProject(): boolean {

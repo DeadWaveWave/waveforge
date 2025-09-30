@@ -19,7 +19,21 @@ import {
   CurrentTaskLogSchema,
   validateParametersAgainstSchema,
 } from './schemas.js';
-import { TaskStatus, LogCategory, LogAction } from '../types/index.js';
+import {
+  EVRValidator,
+  createEVRValidator,
+  LazySync,
+  createLazySync,
+} from '../core/index.js';
+import {
+  TaskStatus,
+  LogCategory,
+  LogAction,
+  type EVRSummary,
+  type EVRDetail,
+  type SyncPreview,
+  type LogEntry,
+} from '../types/index.js';
 
 /**
  * 任务管理工具基础类
@@ -100,6 +114,9 @@ abstract class BaseTaskTool {
  * 初始化具有明确目标和计划的结构化任务
  */
 export class CurrentTaskInitTool extends BaseTaskTool {
+  constructor(taskManager: TaskManager) {
+    super(taskManager);
+  }
   /**
    * 处理任务初始化请求
    */
@@ -171,6 +188,9 @@ export class CurrentTaskInitTool extends BaseTaskTool {
  * 在计划和步骤两个层级更新任务进度
  */
 export class CurrentTaskUpdateTool extends BaseTaskTool {
+  constructor(taskManager: TaskManager) {
+    super(taskManager);
+  }
   /**
    * 处理任务更新请求
    */
@@ -267,9 +287,18 @@ export class CurrentTaskUpdateTool extends BaseTaskTool {
 
 /**
  * Current Task Read 工具实现
- * 读取当前任务完整状态以恢复上下文
+ * 读取当前任务完整状态以恢复上下文，支持 EVR 相关参数和同步预览
  */
 export class CurrentTaskReadTool extends BaseTaskTool {
+  private evrValidator: EVRValidator;
+  private lazySync: LazySync;
+
+  constructor(taskManager: TaskManager) {
+    super(taskManager);
+    this.evrValidator = createEVRValidator();
+    this.lazySync = createLazySync();
+  }
+
   /**
    * 处理任务读取请求
    */
@@ -282,7 +311,10 @@ export class CurrentTaskReadTool extends BaseTaskTool {
         LogCategory.Task,
         LogAction.Handle,
         '开始读取当前任务状态',
-        { includeHealth: params.include_health }
+        {
+          includeEVR: params.evr?.include !== false,
+          requireSkipReason: params.evr?.require_skip_reason !== false,
+        }
       );
 
       // 获取当前任务
@@ -291,51 +323,44 @@ export class CurrentTaskReadTool extends BaseTaskTool {
         throw new NotFoundError('当前没有活跃任务');
       }
 
-      // 处理日志限制
-      const processedTask = { ...task };
-      let logsExcluded = false;
-      let logsTruncated = false;
-      const totalLogsCount = task.logs.length;
-
-      if (params.include_logs === false) {
-        processedTask.logs = [];
-        logsExcluded = true;
-      } else if (params.logs_limit && task.logs.length > params.logs_limit) {
-        processedTask.logs = task.logs.slice(-params.logs_limit);
-        logsTruncated = true;
-      }
-
       // 构建响应数据
       const responseData: any = {
-        task: processedTask,
+        task: this.processTaskData(task, params),
       };
 
-      if (logsExcluded) {
-        responseData.logs_excluded = true;
-      }
-      if (logsTruncated) {
-        responseData.logs_truncated = true;
-        responseData.total_logs_count = totalLogsCount;
-      }
-
-      // 添加健康度信息
-      if (params.include_health !== false) {
-        responseData.health = await this.generateHealthInfo(task);
-      }
-
-      // 添加历史引用
-      if (params.include_history_refs !== false) {
-        responseData.history_refs = await this.generateHistoryRefs();
+      // 添加 EVR 相关信息
+      if (params.evr?.include !== false) {
+        const evrInfo = await this.generateEVRInfo(task, params.evr);
+        responseData.evr_ready = evrInfo.ready;
+        responseData.evr_summary = evrInfo.summary;
+        responseData.evr_details = evrInfo.details;
+      } else {
+        // 即使不包含 EVR 详情，也要提供基本的就绪状态
+        const validation = this.evrValidator.validateEVRReadiness(
+          task.expectedResults || []
+        );
+        responseData.evr_ready = validation.ready;
+        responseData.evr_summary = validation.summary;
+        responseData.evr_details = [];
       }
 
-      // 添加格式化文档
-      responseData.formatted_document = this.generateFormattedDocument(task);
-      responseData.status_summary = this.generateStatusSummary(task);
-      responseData.performance_info = {
-        read_time_ms: (Date.now() % 100) + 10, // 模拟读取时间
-        cache_hit: false,
-        data_size_kb: Math.ceil(JSON.stringify(task).length / 1024),
-      };
+      // 检测面板同步状态（仅干运行预览）
+      const syncInfo = await this.checkPanelSync(task);
+      if (syncInfo.hasPendingChanges) {
+        responseData.panel_pending = true;
+        responseData.sync_preview = syncInfo.preview;
+      } else {
+        responseData.panel_pending = false;
+        // 不返回 sync_preview 字段以避免噪声
+      }
+
+      // 添加日志高亮和计数
+      const logInfo = this.generateLogInfo(task, params);
+      responseData.logs_highlights = logInfo.highlights;
+      responseData.logs_full_count = logInfo.fullCount;
+
+      // 添加缓存信息
+      responseData.md_version = this.generateMdVersion(task);
 
       this.logOperation(
         LogCategory.Task,
@@ -343,8 +368,9 @@ export class CurrentTaskReadTool extends BaseTaskTool {
         '任务状态读取完成',
         {
           taskId: task.id,
-          logsCount: processedTask.logs.length,
-          includeHealth: params.include_health !== false,
+          evrReady: responseData.evr_ready,
+          panelPending: responseData.panel_pending,
+          logsHighlights: responseData.logs_highlights.length,
         }
       );
 
@@ -368,152 +394,177 @@ export class CurrentTaskReadTool extends BaseTaskTool {
   }
 
   /**
-   * 生成健康度信息
+   * 处理任务数据
    */
-  private async generateHealthInfo(task: any) {
-    const checks = {
-      task_integrity: {
-        status: 'passed',
-        issues: [] as string[],
-      },
-      file_system: {
-        status: 'passed',
-        issues: [] as string[],
-      },
-      data_consistency: {
-        status: 'passed',
-        issues: [] as string[],
-      },
-    };
+  private processTaskData(task: any, params: any): any {
+    const processedTask = { ...task };
 
-    // 检查任务完整性
-    if (!task.overall_plan || task.overall_plan.length === 0) {
-      checks.task_integrity.status = 'failed';
-      checks.task_integrity.issues.push('缺少整体计划');
+    // 处理日志限制
+    if (params.include_logs === false) {
+      processedTask.logs = [];
+    } else if (params.logs_limit && task.logs.length > params.logs_limit) {
+      processedTask.logs = task.logs.slice(-params.logs_limit);
     }
 
-    if (!task.goal || task.goal.trim().length === 0) {
-      checks.task_integrity.status = 'failed';
-      checks.task_integrity.issues.push('缺少任务目标');
-    }
+    return processedTask;
+  }
 
-    // 检查数据一致性
-    if (task.current_plan_id) {
-      const currentPlan = task.overall_plan.find(
-        (p: any) => p.id === task.current_plan_id
-      );
-      if (!currentPlan) {
-        checks.data_consistency.status = 'failed';
-        checks.data_consistency.issues.push('当前计划ID无效');
-      }
-    }
+  /**
+   * 生成 EVR 相关信息
+   */
+  private async generateEVRInfo(
+    task: any,
+    evrParams: any = {}
+  ): Promise<{
+    ready: boolean;
+    summary: EVRSummary;
+    details: EVRDetail[];
+  }> {
+    const expectedResults = task.expectedResults || [];
 
-    const overallStatus = Object.values(checks).some(
-      (check) => check.status === 'failed'
-    )
-      ? 'error'
-      : Object.values(checks).some((check) => check.status === 'warning')
-        ? 'warning'
-        : 'healthy';
+    // 使用 EVRValidator 验证就绪性
+    const validation = this.evrValidator.validateEVRReadiness(expectedResults, {
+      requireSkipReason: evrParams.require_skip_reason !== false,
+    });
+
+    // 生成 EVR 详情
+    const details: EVRDetail[] = expectedResults.map((evr: any) => ({
+      evr_id: evr.id,
+      title: evr.title,
+      status: evr.status,
+      last_run: evr.lastRun,
+      referenced_by: evr.referencedBy || [],
+      runs: evr.runs || [],
+    }));
 
     return {
-      status: overallStatus,
-      checks,
-      recommendations:
-        overallStatus === 'healthy' ? [] : ['建议检查任务数据完整性'],
-      last_check: new Date().toISOString(),
+      ready: validation.ready,
+      summary: validation.summary,
+      details,
     };
   }
 
   /**
-   * 生成历史引用
+   * 检查面板同步状态（仅干运行预览）
    */
-  private async generateHistoryRefs() {
+  private async checkPanelSync(_task: any): Promise<{
+    hasPendingChanges: boolean;
+    preview?: SyncPreview;
+  }> {
     try {
-      const history = await this.taskManager.getTaskHistory();
-      return {
-        recent_tasks: history.slice(0, 5), // 最近5个任务
-        total_count: history.length,
-        last_updated: new Date().toISOString(),
-      };
+      // 尝试读取面板内容
+      const panelPath = this.taskManager.getCurrentTaskPanelPath();
+      if (!panelPath) {
+        return { hasPendingChanges: false };
+      }
+
+      // 这里应该读取面板内容，但由于我们还没有实现面板文件系统
+      // 暂时返回无变更状态
+      // TODO: 实现面板内容读取和差异检测
+
+      return { hasPendingChanges: false };
     } catch (error) {
-      // 如果获取历史失败，返回空数据
-      return {
-        recent_tasks: [],
-        total_count: 0,
-        last_updated: new Date().toISOString(),
-      };
+      // 如果检测失败，记录错误但不影响主流程
+      this.logOperation(
+        LogCategory.Exception,
+        LogAction.Handle,
+        '面板同步检测失败',
+        { error: error instanceof Error ? error.message : String(error) }
+      );
+
+      return { hasPendingChanges: false };
     }
   }
 
   /**
-   * 生成格式化的 Markdown 文档
+   * 生成日志高亮和计数信息
    */
-  private generateFormattedDocument(task: any): string {
-    const lines = [
-      `# ${task.title}`,
-      '',
-      '## 验收标准',
-      task.goal,
-      '',
-      '## 整体计划',
-    ];
+  private generateLogInfo(
+    task: any,
+    _params: any
+  ): {
+    highlights: LogEntry[];
+    fullCount: number;
+  } {
+    const allLogs = task.logs || [];
+    const fullCount = allLogs.length;
 
-    task.overall_plan.forEach((plan: any, index: number) => {
-      const status =
-        plan.status === 'completed'
-          ? '✅'
-          : plan.status === 'in_progress'
-            ? '🔄'
-            : plan.status === 'blocked'
-              ? '🚫'
-              : '⏳';
-      lines.push(`${index + 1}. ${status} ${plan.description}`);
+    // 生成高亮日志（重点日志筛选）
+    const highlights = this.selectHighlightLogs(allLogs);
 
-      if (plan.steps && plan.steps.length > 0) {
-        plan.steps.forEach((step: any) => {
-          const stepStatus =
-            step.status === 'completed'
-              ? '✅'
-              : step.status === 'in_progress'
-                ? '🔄'
-                : step.status === 'blocked'
-                  ? '🚫'
-                  : '⏳';
-          lines.push(`   - ${stepStatus} ${step.description}`);
-        });
-      }
-    });
-
-    lines.push('', '## 执行日志');
-    task.logs.slice(-5).forEach((log: any) => {
-      const localTime = new Date(log.timestamp).toLocaleString();
-      lines.push(`- **${localTime}**: ${log.message}`);
-    });
-
-    return lines.join('\n');
+    return {
+      highlights,
+      fullCount,
+    };
   }
 
   /**
-   * 生成状态摘要
+   * 选择高亮日志
    */
-  private generateStatusSummary(task: any) {
-    const currentPlan = task.overall_plan.find(
-      (p: any) => p.id === task.current_plan_id
-    );
-    const completedPlans = task.overall_plan.filter(
-      (p: any) => p.status === 'completed'
-    ).length;
-    const totalPlans = task.overall_plan.length;
+  private selectHighlightLogs(logs: any[]): LogEntry[] {
+    const highlights: LogEntry[] = [];
+    const maxHighlights = 20; // 最多20条高亮
 
-    return {
-      current_plan: currentPlan ? currentPlan.description : '无当前计划',
-      progress: `${completedPlans}/${totalPlans} 计划完成`,
-      next_actions:
-        currentPlan && currentPlan.steps.length === 0
-          ? ['需要为当前计划生成步骤']
-          : ['继续执行当前计划'],
+    // 优先级：EXCEPTION > TEST > TASK/MODIFY > DISCUSSION
+    const priorityOrder = ['EXCEPTION', 'TEST', 'TASK', 'MODIFY', 'DISCUSSION'];
+
+    // 按优先级和时间排序
+    const sortedLogs = logs
+      .filter((log) => log.category && priorityOrder.includes(log.category))
+      .sort((a, b) => {
+        const aPriority = priorityOrder.indexOf(a.category);
+        const bPriority = priorityOrder.indexOf(b.category);
+        if (aPriority !== bPriority) {
+          return aPriority - bPriority; // 优先级高的在前
+        }
+        return (
+          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+        ); // 时间新的在前
+      });
+
+    // 选择前 N 条作为高亮
+    for (let i = 0; i < Math.min(sortedLogs.length, maxHighlights); i++) {
+      const log = sortedLogs[i];
+      highlights.push({
+        ts: log.timestamp,
+        level: log.level || 'INFO',
+        category: log.category,
+        action: log.action,
+        message: log.message,
+      });
+    }
+
+    return highlights;
+  }
+
+  /**
+   * 生成 MD 版本号（ETag）
+   */
+  private generateMdVersion(task: any): string {
+    // 基于任务的关键字段生成版本号，包含更多细节以确保唯一性
+    const versionData = {
+      id: task.id,
+      updated_at: task.updatedAt,
+      plans_count: task.plans?.length || 0,
+      evrs_count: task.expectedResults?.length || 0,
+      logs_count: task.logs?.length || 0,
+      // 添加更多细节以确保版本号的唯一性
+      plans_hash:
+        task.plans?.map((p: any) => `${p.id}:${p.status}`).join(',') || '',
+      evrs_hash:
+        task.expectedResults
+          ?.map((e: any) => `${e.id}:${e.status}`)
+          .join(',') || '',
+      logs_hash:
+        task.logs
+          ?.slice(-3)
+          .map((l: any) => l.timestamp)
+          .join(',') || '',
     };
+
+    return Buffer.from(JSON.stringify(versionData))
+      .toString('base64')
+      .slice(0, 16);
   }
 
   /**
@@ -533,6 +584,9 @@ export class CurrentTaskReadTool extends BaseTaskTool {
  * 动态修改任务结构，包括计划、步骤和目标
  */
 export class CurrentTaskModifyTool extends BaseTaskTool {
+  constructor(taskManager: TaskManager) {
+    super(taskManager);
+  }
   /**
    * 处理任务修改请求
    */
@@ -618,6 +672,9 @@ export class CurrentTaskModifyTool extends BaseTaskTool {
  * 完成当前任务并生成文档
  */
 export class CurrentTaskCompleteTool extends BaseTaskTool {
+  constructor(taskManager: TaskManager) {
+    super(taskManager);
+  }
   /**
    * 处理任务完成请求
    */
@@ -693,6 +750,9 @@ export class CurrentTaskCompleteTool extends BaseTaskTool {
  * 记录非任务状态变更的重要事件
  */
 export class CurrentTaskLogTool extends BaseTaskTool {
+  constructor(taskManager: TaskManager) {
+    super(taskManager);
+  }
   /**
    * 处理日志记录请求
    */

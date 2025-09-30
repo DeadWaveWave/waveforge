@@ -130,7 +130,9 @@ describe('Schema 定义验证', () => {
     it('current_task_read Schema 应该有正确的默认值', () => {
       const schema = ToolSchemas.current_task_read;
 
-      expect(schema.inputSchema.properties.include_health.default).toBe(true);
+      expect(schema.inputSchema.properties.evr.properties.include.default).toBe(
+        true
+      );
       expect(schema.inputSchema.properties.include_history_refs.default).toBe(
         true
       );
@@ -489,10 +491,7 @@ describe('Schema 验证工具函数', () => {
 
   describe('getFieldDefault', () => {
     it('应该返回字段的默认值', () => {
-      const defaultValue = getFieldDefault(
-        'current_task_read',
-        'include_health'
-      );
+      const defaultValue = getFieldDefault('current_task_read', 'include_logs');
       expect(defaultValue).toBe(true);
     });
 
@@ -530,7 +529,7 @@ describe('Schema 验证工具函数', () => {
     it('应该为 current_task_read 生成示例参数', () => {
       const example = generateExampleParams('current_task_read');
 
-      expect(example.include_health).toBe(true);
+      expect(example.include_logs).toBe(true);
       expect(example.logs_limit).toBe(50);
     });
 

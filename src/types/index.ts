@@ -1699,3 +1699,18 @@ export interface ProjectRegistryState {
     averageConnectionDuration: number;
   };
 }
+/**
+ * 日志条目接口（用于高亮日志）
+ */
+export interface LogEntry {
+  /** 时间戳 */
+  ts: string;
+  /** 日志级别 */
+  level: 'INFO' | 'WARN' | 'ERROR';
+  /** 日志分类 */
+  category: 'TEST' | 'TASK' | 'EXCEPTION' | 'DISCUSSION' | 'PLAN' | 'SYSTEM';
+  /** 操作类型 */
+  action?: string;
+  /** 日志消息 */
+  message: string;
+}

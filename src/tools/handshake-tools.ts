@@ -588,7 +588,17 @@ export class HandshakeChecker {
 
     // 检查活动任务
     try {
-      const currentTask = await this.taskManager.getCurrentTask();
+      // 获取当前连接的项目 ID
+      const activeProject = this.projectManager.getActiveProject();
+      const projectId = activeProject?.project_id;
+
+      // 尝试获取当前任务，先尝试带项目 ID 的路径
+      let currentTask = await this.taskManager.getCurrentTask(projectId);
+
+      // 如果带项目 ID 的路径没找到任务，且项目 ID 存在，则尝试默认路径
+      if (!currentTask && projectId) {
+        currentTask = await this.taskManager.getCurrentTask();
+      }
       if (!currentTask) {
         return {
           content: [

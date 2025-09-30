@@ -299,14 +299,26 @@ export const CurrentTaskUpdateSchema = {
  */
 export const CurrentTaskReadSchema = {
   name: 'current_task_read',
-  description: '读取当前任务完整状态以恢复上下文，支持健康度信息和历史引用',
+  description: '读取当前任务完整状态以恢复上下文，支持 EVR 相关参数和同步预览',
   inputSchema: {
     type: 'object' as const,
     properties: {
-      include_health: {
-        type: 'boolean' as const,
-        description: '是否包含健康度信息',
-        default: true,
+      evr: {
+        type: 'object' as const,
+        description: 'EVR 相关参数',
+        properties: {
+          include: {
+            type: 'boolean' as const,
+            description: '是否包含 EVR 信息',
+            default: true,
+          },
+          require_skip_reason: {
+            type: 'boolean' as const,
+            description: '是否要求 skip 状态必须有理由',
+            default: true,
+          },
+        },
+        additionalProperties: false,
       },
       include_history_refs: {
         type: 'boolean' as const,

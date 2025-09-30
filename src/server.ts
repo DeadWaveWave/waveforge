@@ -87,7 +87,7 @@ class WaveForgeServer {
     this.setupNotificationHandlers();
     this.registerSystemTools();
     this.registerProjectManagementTools();
-    this.registerTaskManagementTools();
+    // 注意：任务管理工具将在 start() 方法中初始化 TaskManager 后注册
   }
 
   /**
@@ -686,6 +686,9 @@ class WaveForgeServer {
 
       this.taskManager = new TaskManager(waveDir, this.projectManager);
       this.multiTaskDirectoryManager = new MultiTaskDirectoryManager(waveDir);
+
+      // 现在 TaskManager 已初始化，可以注册任务管理工具
+      this.registerTaskManagementTools();
 
       // 创建 stdio 传输
       const transport = new StdioServerTransport();

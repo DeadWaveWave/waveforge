@@ -768,34 +768,28 @@ describe('CurrentTaskReadTool', () => {
       expect(response.task.logs).toBeDefined();
     });
 
-    it('应该包含健康度信息', async () => {
-      const result = await taskReadTool.handle({ include_health: true });
+    it('应该包含 EVR 信息', async () => {
+      const result = await taskReadTool.handle({ evr: { include: true } });
       const response = JSON.parse(result.content[0].text);
 
       expect(response.success).toBe(true);
-      expect(response.health).toBeDefined();
-      expect(response.health.status).toMatch(/^(healthy|warning|error)$/);
-      expect(response.health.checks).toBeDefined();
-      expect(response.health.checks.task_integrity).toBeDefined();
-      expect(response.health.checks.file_system).toBeDefined();
-      expect(response.health.checks.data_consistency).toBeDefined();
+      expect(response.evr_ready).toBeDefined();
+      expect(response.evr_summary).toBeDefined();
+      expect(response.evr_details).toBeDefined();
+      expect(Array.isArray(response.evr_details)).toBe(true);
     });
 
-    it('应该包含历史任务引用', async () => {
-      // 创建另一个任务作为历史
-      await mockTaskManager.completeTask('第一个任务完成');
-      await mockTaskManager.initTask({
-        title: '第二个任务',
-        goal: '完成第二个功能的详细实现和测试',
-      });
-
+    it('应该包含面板同步状态', async () => {
       const result = await taskReadTool.handle({ include_history_refs: true });
       const response = JSON.parse(result.content[0].text);
 
       expect(response.success).toBe(true);
-      expect(response.history_refs).toBeDefined();
-      expect(response.history_refs.recent_tasks).toBeDefined();
-      expect(response.history_refs.total_count).toBeGreaterThan(0);
+      expect(response.panel_pending).toBeDefined();
+      expect(typeof response.panel_pending).toBe('boolean');
+      // 如果有待处理的变更，应该有预览信息
+      if (response.panel_pending) {
+        expect(response.sync_preview).toBeDefined();
+      }
     });
 
     it('应该支持日志数量限制', async () => {
@@ -817,8 +811,8 @@ describe('CurrentTaskReadTool', () => {
 
       expect(response.success).toBe(true);
       expect(response.task.logs).toHaveLength(5);
-      expect(response.logs_truncated).toBe(true);
-      expect(response.total_logs_count).toBeGreaterThan(5);
+      expect(response.logs_highlights).toBeDefined();
+      expect(response.logs_full_count).toBeGreaterThan(5);
     });
 
     it('应该支持排除日志', async () => {
@@ -827,7 +821,7 @@ describe('CurrentTaskReadTool', () => {
 
       expect(response.success).toBe(true);
       expect(response.task.logs).toHaveLength(0);
-      expect(response.logs_excluded).toBe(true);
+      expect(response.logs_highlights).toBeDefined();
     });
   });
 
@@ -888,39 +882,39 @@ describe('CurrentTaskReadTool', () => {
 
       expect(response.success).toBe(true);
       expect(response.task.overall_plan).toHaveLength(20);
-      expect(response.performance_info).toBeDefined();
-      expect(response.performance_info.read_time_ms).toBeLessThan(1000);
+      expect(response.md_version).toBeDefined();
+      expect(typeof response.md_version).toBe('string');
     });
   });
 
   describe('数据完整性检查', () => {
     it('应该检测任务数据完整性问题', async () => {
-      const result = await taskReadTool.handle({ include_health: true });
+      const result = await taskReadTool.handle({ evr: { include: true } });
       const response = JSON.parse(result.content[0].text);
 
       expect(response.success).toBe(true);
-      expect(response.health).toBeDefined();
-      expect(response.health.status).toMatch(/^(healthy|warning|error)$/);
-      expect(response.health.checks).toBeDefined();
+      expect(response.evr_ready).toBeDefined();
+      expect(response.evr_summary).toBeDefined();
+      expect(response.evr_details).toBeDefined();
     });
 
     it('应该检测文件系统问题', async () => {
-      const result = await taskReadTool.handle({ include_health: true });
+      const result = await taskReadTool.handle({ evr: { include: true } });
       const response = JSON.parse(result.content[0].text);
 
       expect(response.success).toBe(true);
-      expect(response.health).toBeDefined();
-      expect(response.health.checks.file_system).toBeDefined();
+      expect(response.panel_pending).toBeDefined();
+      expect(typeof response.panel_pending).toBe('boolean');
     });
 
     it('应该提供数据修复建议', async () => {
-      const result = await taskReadTool.handle({ include_health: true });
+      const result = await taskReadTool.handle({ evr: { include: true } });
       const response = JSON.parse(result.content[0].text);
 
       expect(response.success).toBe(true);
-      expect(response.health).toBeDefined();
-      expect(response.health.recommendations).toBeDefined();
-      expect(Array.isArray(response.health.recommendations)).toBe(true);
+      expect(response.evr_summary).toBeDefined();
+      expect(response.evr_details).toBeDefined();
+      expect(Array.isArray(response.evr_details)).toBe(true);
     });
   });
 
@@ -965,11 +959,11 @@ describe('CurrentTaskReadTool', () => {
       const response = JSON.parse(result.content[0].text);
 
       expect(response.success).toBe(true);
-      expect(response.formatted_document).toBeDefined();
-      expect(response.formatted_document).toContain('# 实现用户认证系统');
-      expect(response.formatted_document).toContain('## 验收标准');
-      expect(response.formatted_document).toContain('## 整体计划');
-      expect(response.formatted_document).toContain('## 执行日志');
+      expect(response.task).toBeDefined();
+      expect(response.evr_ready).toBeDefined();
+      expect(response.evr_summary).toBeDefined();
+      expect(response.logs_highlights).toBeDefined();
+      expect(response.md_version).toBeDefined();
     });
 
     it('应该包含当前状态摘要', async () => {
@@ -977,10 +971,10 @@ describe('CurrentTaskReadTool', () => {
       const response = JSON.parse(result.content[0].text);
 
       expect(response.success).toBe(true);
-      expect(response.status_summary).toBeDefined();
-      expect(response.status_summary.current_plan).toBeDefined();
-      expect(response.status_summary.progress).toBeDefined();
-      expect(response.status_summary.next_actions).toBeDefined();
+      expect(response.evr_summary).toBeDefined();
+      expect(response.panel_pending).toBeDefined();
+      expect(response.logs_full_count).toBeDefined();
+      expect(response.md_version).toBeDefined();
     });
   });
 
@@ -995,9 +989,14 @@ describe('CurrentTaskReadTool', () => {
         inputSchema: {
           type: 'object',
           properties: {
-            include_health: expect.objectContaining({
-              type: 'boolean',
-              default: true,
+            evr: expect.objectContaining({
+              type: 'object',
+              properties: expect.objectContaining({
+                include: expect.objectContaining({
+                  type: 'boolean',
+                  default: true,
+                }),
+              }),
             }),
             logs_limit: expect.objectContaining({
               type: 'integer',

@@ -163,6 +163,29 @@ export class TaskManager {
   }
 
   /**
+   * 获取当前任务面板路径
+   */
+  getCurrentTaskPanelPath(): string | null {
+    try {
+      const fs = require('fs');
+      const path = require('path');
+
+      // 检查 .wave/current-task.md 是否存在
+      const panelPath = path.join(
+        path.dirname(this.docsPath),
+        'current-task.md'
+      );
+      if (fs.existsSync(panelPath)) {
+        return panelPath;
+      }
+
+      return null;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  /**
    * 检查并执行自动迁移
    */
   private async checkAndPerformMigration(): Promise<void> {
