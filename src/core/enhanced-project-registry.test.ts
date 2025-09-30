@@ -35,6 +35,13 @@ describe('EnhancedProjectRegistry', () => {
   });
 
   afterEach(async () => {
+    // 断开当前连接，避免状态污染
+    try {
+      await registry.unbindFromSession();
+    } catch {
+      // 忽略错误
+    }
+
     await fs.remove(tempDir);
   });
 
@@ -55,8 +62,9 @@ describe('EnhancedProjectRegistry', () => {
       const result = await registry.connectProject(params);
 
       expect(result.connected).toBe(false);
-      expect(result.error).toBe('NOT_FOUND');
-      expect(result.message).toContain('未找到匹配的项目');
+      // 路径不存在时应返回 INVALID_ROOT 而不是 NOT_FOUND
+      expect(result.error).toBe('INVALID_ROOT');
+      expect(result.message).toContain('项目路径无效');
     });
 
     it('应该在没有提供参数时返回错误', async () => {
@@ -407,6 +415,13 @@ describe('项目连接集成测试', () => {
   });
 
   afterEach(async () => {
+    // 断开当前连接，避免状态污染
+    try {
+      await registry.unbindFromSession();
+    } catch {
+      // 忽略错误
+    }
+
     await fs.remove(tempDir);
   });
 

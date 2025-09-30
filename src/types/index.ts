@@ -141,6 +141,7 @@ export interface ActiveProjectBinding {
 
 /**
  * project_bind 工具参数
+ * @deprecated 使用 ConnectParams 代替，该类型仅为向后兼容保留
  */
 export interface ProjectBindParams {
   /** 项目ID（可选，与project_path二选一） */
@@ -151,6 +152,7 @@ export interface ProjectBindParams {
 
 /**
  * project_bind 工具响应
+ * @deprecated 使用 ConnectionResult 代替，该类型仅为向后兼容保留
  */
 export interface ProjectBindResponse {
   /** 绑定的项目信息 */

@@ -4,30 +4,168 @@
 
 ## 🚨 已知问题与解决方案
 
-### 1. MCP 工具名称冲突问题
+### 1. connect_project 与 project_bind 共享底层实现导致的问题
 
 **问题描述**：
 
 - 原始的 `project_bind` 工具无法在 Kiro IDE 中正常工作
-- 工具在 MCP 配置中同时出现在 `autoApprove` 和 `disabledTools` 列表中
-- 即使是简化的实现也无法正常响应
+- 创建 `connect_project` 作为替代后，问题依然存在
+- 两个工具都表现出相同的故障模式
 
-**根本原因**：
-`project_bind` 这个工具名称在 Kiro IDE 中可能是保留名称或有特殊处理逻辑。
+**根本原因分析**（2025-09-30 更新）：
 
-**解决方案**：
+经过深入代码分析发现，**问题不是工具名称冲突**，而是 `connect_project` 和 `project_bind` 共享了相同的底层实现：
 
-- 将工具重命名为 `connect_project`
-- 保持相同的功能和参数结构
-- 更新相关文档和测试
+1. **共享的调用链**：
+   - `connect_project` → `ConnectProjectTool.connectByRoot()` → `ProjectManager.bindProject()`
+   - `project_bind` → `ProjectBindTool.handle()` → `ProjectManager.bindProject()`
+   - 两者最终都调用相同的 `ProjectManager.bindProject()` 方法
+
+2. **共享的底层代码**：
+   - `ProjectManager.bindProject()` 使用 `ProjectRegistry.validateProjectPath()`
+   - `ProjectManager.bindProject()` 使用 `ProjectRegistry.initializeProject()`
+   - 这些都是 `project_bind` 时代的旧代码
+
+3. **设计违背**：
+   - 按照设计文档（current-task-outcome-sync.md），`connect_project` 应该是握手流程的核心工具
+   - 但当前实现中，它只是 `project_bind` 的一个薄包装层
+   - 任何 `project_bind` 的底层问题都会直接传递给 `connect_project`
+
+**解决方案**（任务 7.1）：
+
+- 为 `connect_project` 创建完全独立的实现
+- 使用 `EnhancedProjectRegistry` 的现代化 API
+- 按设计文档实现 root/slug/repo 三种连接方式
+- 完全移除 `project_bind` 工具及其所有相关代码
+- 确保 `connect_project` 不再依赖任何 `project_bind` 时代的代码路径
 
 **经验教训**：
 
-- MCP 工具名称选择需要避免可能的保留字
-- 在调试 MCP 工具问题时，应该首先尝试不同的工具名称
-- 使用描述性但不常见的名称可以避免冲突
+- ~~MCP 工具名称选择需要避免可能的保留字~~（已证实不是名称问题）
+- 当替换工具不work时，需要检查是否共享了有问题的底层实现
+- 新工具应该有独立的实现，而不是简单地包装旧代码
+- 代码重构时要彻底清理旧代码，避免间接依赖
+- Git 历史分析很重要：`connect_project` 的诞生是因为 `project_bind` 问题，但没有解决根本原因
 
-### 2. MCP 服务器日志输出干扰问题
+### 2. JSON Schema anyOf/oneOf 兼容性问题（Cursor/Kiro 无法使用工具）
+
+**问题描述**：
+
+- connect_project 工具在 Cursor 和 Kiro IDE 中报错 "An unexpected error occurred"
+- 同样的工具在 Codex 中正常工作
+- MCP 服务器成功连接，但工具调用失败
+- 本地测试和单元测试全部通过
+
+**根本原因**（2025-09-30 发现）：
+
+在提交 156b697 中，工具的 JSON Schema 定义使用了 `anyOf` 和 `oneOf` 语法：
+
+**问题 1: connect_project 使用了 anyOf**
+
+```typescript
+inputSchema: {
+  type: 'object',
+  properties: { /* ... */ },
+  additionalProperties: false,
+  anyOf: [                          // ⚠️ Cursor/Kiro 不支持
+    { required: ['root'] },
+    { required: ['project_path'] },
+    { required: ['slug'] },
+    { required: ['repo'] },
+  ],
+}
+```
+
+**问题 2: current_task_modify 使用了 oneOf**
+
+```typescript
+content: {
+  oneOf: [                          // ⚠️ Cursor/Kiro 不支持
+    { type: 'string' },
+    { type: 'array', items: { type: 'string' } },
+  ],
+}
+```
+
+**不同 MCP 客户端对 JSON Schema 的支持不同**：
+
+- ✗ Cursor/Kiro：严格的 schema 验证，**不支持 anyOf/oneOf/allOf**
+- ✓ Codex：更宽容的 schema 验证，忽略复杂约束
+
+**解决方案**：
+
+移除所有高级 schema 特性，使用最简单的 JSON Schema 语法：
+
+```typescript
+// connect_project 修复
+inputSchema: {
+  type: 'object',
+  properties: {
+    root: { type: 'string', description: '...' },
+    project_path: { type: 'string', description: '...' },
+    slug: { type: 'string', description: '...' },
+    repo: { type: 'string', description: '...' },
+  },
+  additionalProperties: false,
+  // 不使用 anyOf - 在 description 中说明
+  // 参数验证在代码逻辑中进行
+}
+
+// current_task_modify 修复
+content: {
+  // 移除 oneOf - 可以是 string 或 string[]
+  description: '修改内容（字符串或字符串数组）',
+  // 类型验证在代码中进行
+}
+```
+
+**MCP 配置修复**：
+
+如果 MCP 服务器启动失败（"Connection closed"），检查配置：
+
+```json
+{
+  "mcpServers": {
+    "waveforge": {
+      "command": "node",
+      "args": ["/absolute/path/to/waveforge/dist/esm/server.js"],
+      "env": {
+        "WF_LOG_LEVEL": "SILENT",
+        "WF_DEBUG": "false"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "connect_project",
+        "project_info",
+        "current_task_init",
+        "current_task_read",
+        "current_task_update",
+        "current_task_modify",
+        "current_task_complete",
+        "current_task_log"
+      ],
+      "disabledTools": ["health", "ping"]
+    }
+  }
+}
+```
+
+**重启步骤**：
+
+1. 保存配置文件
+2. 在 IDE 中完全重启 MCP 服务器（断开并重新连接）
+3. Cursor 用户可能需要重启整个 IDE
+
+**经验教训**：
+
+- MCP 工具的 JSON Schema 应该使用最保守、最基本的语法
+- **避免使用所有高级 schema 特性**：`anyOf`、`oneOf`、`allOf`、`not`、条件验证等
+- 复杂的参数验证应该在工具实现的代码中进行，而不是依赖 JSON Schema
+- 不同 MCP 客户端对 JSON Schema 的支持程度差异很大
+- 单元测试通过不代表在所有 MCP 客户端中能用，需要在实际客户端中测试
+- **配置文件中必须使用绝对路径**，不要使用命令别名
+
+### 3. MCP 服务器日志输出干扰问题
 
 **问题描述**：
 

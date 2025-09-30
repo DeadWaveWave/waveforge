@@ -30,7 +30,8 @@ import { ProjectRootManager } from './core/project-root-manager.js';
 import { ProjectManager } from './core/project-manager.js';
 import { toolRegistry } from './core/tool-registry.js';
 import { TaskManager } from './core/task-manager.js';
-import { ProjectBindTool, ProjectInfoTool } from './tools/project-tools.js';
+// ProjectInfoTool 已移至 handshake-tools.js
+// import { ProjectInfoTool } from './tools/project-tools.js'; // 该文件已被删除
 import {
   ProjectInfoTool as HandshakeProjectInfoTool,
   ConnectProjectTool,
@@ -332,25 +333,11 @@ class WaveForgeServer {
       enabled: true,
     });
 
-    // 保留旧的项目管理工具作为兼容性支持
-    const projectBindTool = new ProjectBindTool(this.projectManager);
-    const _legacyProjectInfoTool = new ProjectInfoTool(this.projectManager);
-
-    // 注册 project_bind 工具（兼容性）
-    toolRegistry.registerTool({
-      name: 'project_bind',
-      handler: {
-        getDefinition: () => ProjectBindTool.getDefinition(),
-        handle: async (args: any) => await projectBindTool.handle(args),
-      },
-      category: 'project',
-      description: '绑定项目到当前连接（兼容性工具）',
-      enabled: true,
-    });
+    // 注意：project_bind 工具已被移除，使用 connect_project 代替
 
     logger.info(LogCategory.Task, LogAction.Create, '项目管理工具注册完成', {
       handshakeTools: ['project_info', 'connect_project'],
-      legacyTools: ['project_bind'],
+      note: 'project_bind 已移除，使用 connect_project 代替',
     });
   }
 

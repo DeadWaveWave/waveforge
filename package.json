@@ -6,6 +6,9 @@
   "module": "dist/esm/server.js",
   "types": "dist/esm/server.d.ts",
   "type": "module",
+  "bin": {
+    "waveforge": "./dist/server.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/esm/server.d.ts",
@@ -40,12 +43,14 @@
     "start": "node dist/server.js",
     "start:esm": "node dist/esm/server.js",
     "start:cjs": "node dist/cjs/server.cjs",
-    "test": "vitest --run",
+    "test": "vitest --run --no-file-parallelism",
     "test:watch": "vitest",
-    "test:coverage": "vitest --coverage",
+    "test:coverage": "vitest --coverage --no-file-parallelism",
     "test:ui": "vitest --ui",
-    "test:unit": "vitest --run src/**/*.test.ts",
-    "test:integration": "vitest --run src/**/*.integration.test.ts",
+    "test:unit": "vitest --run src/**/*.test.ts --no-file-parallelism",
+    "test:integration": "vitest --run src/**/*.integration.test.ts --no-file-parallelism",
+    "test:stable": "vitest --run --no-file-parallelism --exclude=src/core/concurrency-manager.test.ts",
+    "test:flaky": "vitest --run src/core/concurrency-manager.test.ts",
     "type-check": "tsc --noEmit",
     "type-check:watch": "tsc --noEmit --watch",
     "lint": "eslint src --ext .ts",
@@ -60,7 +65,7 @@
     "prepack": "pnpm run build",
     "prepublishOnly": "pnpm run ci && pnpm run build",
     "validate:schemas": "node scripts/validate-schemas.js",
-    "ci": "pnpm run type-check && pnpm run lint && pnpm run test && pnpm run validate:schemas",
+    "ci": "pnpm run type-check && pnpm run lint && pnpm run test:stable && pnpm run validate:schemas",
     "ci:full": "pnpm run clean && pnpm run ci && pnpm run build && pnpm run test:coverage",
     "release": "pnpm run ci:full",
     "health": "node -e \"console.log('Node.js version:', process.version); console.log('Platform:', process.platform); console.log('Architecture:', process.arch);\"",

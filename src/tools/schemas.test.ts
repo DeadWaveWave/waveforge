@@ -114,18 +114,17 @@ describe('Schema 定义验证', () => {
       ]);
     });
 
-    it('current_task_modify Schema 应该支持 oneOf 内容类型', () => {
+    it('current_task_modify Schema 应该支持灵活的内容类型', () => {
       const schema = ToolSchemas.current_task_modify;
 
-      expect(schema.inputSchema.properties.content).toHaveProperty('oneOf');
-      expect(schema.inputSchema.properties.content.oneOf).toHaveLength(2);
-      expect(schema.inputSchema.properties.content.oneOf[0]).toEqual({
-        type: 'string',
-      });
-      expect(schema.inputSchema.properties.content.oneOf[1]).toEqual({
-        type: 'array',
-        items: { type: 'string' },
-      });
+      // oneOf 已移除以兼容 Cursor/Kiro
+      // content 字段现在不指定类型，在代码中验证
+      expect(schema.inputSchema.properties.content).toHaveProperty(
+        'description'
+      );
+      expect(schema.inputSchema.properties.content.description).toContain(
+        '字符串或字符串数组'
+      );
     });
 
     it('current_task_read Schema 应该有正确的默认值', () => {
@@ -165,7 +164,8 @@ describe('Schema 定义验证', () => {
     it('getToolDefinitions 应该返回所有工具定义', () => {
       const definitions = getToolDefinitions();
 
-      expect(definitions).toHaveLength(12);
+      // 从 12 减少到 11，因为移除了 project_bind
+      expect(definitions).toHaveLength(11);
       definitions.forEach((def) => {
         expect(def).toHaveProperty('name');
         expect(def).toHaveProperty('description');
@@ -430,7 +430,7 @@ describe('Schema 验证工具函数', () => {
       expect(result.errors).toContain('不允许的字段: extra_field');
     });
 
-    it('应该验证 oneOf 类型', () => {
+    it('应该验证灵活的内容类型', () => {
       const validStringParams = {
         field: 'goal',
         content: '字符串内容',
@@ -445,13 +445,8 @@ describe('Schema 验证工具函数', () => {
         change_type: 'plan_adjustment',
       };
 
-      const invalidParams = {
-        field: 'goal',
-        content: 123, // 无效类型
-        reason: '测试原因',
-        change_type: 'refine_goal',
-      };
-
+      // content 字段类型验证已移至代码逻辑中
+      // schema 层面不再强制类型检查（为了兼容 Cursor/Kiro）
       expect(
         validateParametersAgainstSchema(
           'current_task_modify',
@@ -462,10 +457,9 @@ describe('Schema 验证工具函数', () => {
         validateParametersAgainstSchema('current_task_modify', validArrayParams)
           .valid
       ).toBe(true);
-      expect(
-        validateParametersAgainstSchema('current_task_modify', invalidParams)
-          .valid
-      ).toBe(false);
+
+      // 注意：数字类型现在在 schema 层面不会被拒绝
+      // 实际的类型验证会在工具实现的代码中进行
     });
   });
 
@@ -540,10 +534,12 @@ describe('Schema 验证工具函数', () => {
       expect(example.logs_limit).toBe(50);
     });
 
-    it('应该处理 oneOf 类型字段', () => {
+    it('应该处理灵活类型字段', () => {
       const example = generateExampleParams('current_task_modify');
 
-      expect(example.content).toBe('示例内容');
+      // content 字段现在没有严格的类型定义
+      expect(example).toHaveProperty('field');
+      expect(example).toHaveProperty('change_type');
       expect(example.field).toBe('goal');
       expect(example.change_type).toBe('generate_steps');
     });
@@ -553,14 +549,16 @@ describe('Schema 验证工具函数', () => {
     it('应该返回正确的工具统计信息', () => {
       const stats = getToolsStatistics();
 
-      expect(stats.total).toBe(12);
+      // 总数从 12 减少到 11，因为移除了 project_bind 工具
+      expect(stats.total).toBe(11);
       expect(stats.taskManagement).toBe(6);
       expect(stats.system).toBe(4);
-      expect(stats.projectManagement).toBe(2);
-      expect(stats.tools.all).toHaveLength(12);
+      // projectManagement 从 2 减少到 1（只剩 project_info）
+      expect(stats.projectManagement).toBe(1);
+      expect(stats.tools.all).toHaveLength(11);
       expect(stats.tools.taskManagement).toHaveLength(6);
       expect(stats.tools.system).toHaveLength(4);
-      expect(stats.tools.projectManagement).toHaveLength(2);
+      expect(stats.tools.projectManagement).toHaveLength(1);
       expect(stats.tools.system).toContain('health');
       expect(stats.tools.system).toContain('ping');
       expect(stats.tools.system).toContain('task_list');

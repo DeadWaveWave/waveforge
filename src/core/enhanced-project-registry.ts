@@ -38,8 +38,8 @@ export class EnhancedProjectRegistry {
     duration?: number;
   }> = [];
 
-  constructor() {
-    this.baseRegistry = new ProjectRegistry();
+  constructor(baseRegistry?: ProjectRegistry) {
+    this.baseRegistry = baseRegistry || new ProjectRegistry();
     this.sessionId = ulid();
 
     logger.info(LogCategory.Task, LogAction.Create, '增强项目注册表初始化', {
@@ -86,6 +86,15 @@ export class EnhancedProjectRegistry {
 
       // 处理解析结果
       if (!resolveResult.found) {
+        // 如果是通过 root 路径解析且有错误原因，说明是路径验证失败
+        if (resolveResult.method === 'root' && resolveResult.error) {
+          return {
+            connected: false,
+            error: 'INVALID_ROOT' as ErrorCode,
+            message: `项目路径无效: ${resolveResult.error}`,
+          };
+        }
+
         return {
           connected: false,
           error: 'NOT_FOUND' as ErrorCode,

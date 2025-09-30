@@ -350,13 +350,8 @@ export const CurrentTaskModifySchema = {
           '修改字段：goal=验收标准，plan=整体计划，steps=计划步骤，hints=用户提示',
       },
       content: {
-        oneOf: [
-          { type: 'string' as const },
-          {
-            type: 'array' as const,
-            items: { type: 'string' as const },
-          },
-        ],
+        // 移除 oneOf 以兼容 Cursor/Kiro
+        // 可以是 string 或 string[]，在代码中验证
         description: '修改内容（字符串或字符串数组）',
       },
       reason: {
@@ -466,31 +461,7 @@ export const CurrentTaskLogSchema = {
   },
 };
 
-/**
- * Project Bind 工具 Schema
- */
-export const ProjectBindSchema = {
-  name: 'project_bind',
-  description:
-    '绑定项目到当前连接，提供稳定项目标识，确保文件写入项目根目录下的.wave文件夹中',
-  inputSchema: {
-    type: 'object' as const,
-    properties: {
-      project_id: {
-        type: 'string' as const,
-        description: '项目ID（可选，与project_path二选一）',
-        minLength: 1,
-      },
-      project_path: {
-        type: 'string' as const,
-        description: '项目路径（可选，与project_id二选一）',
-        minLength: 1,
-      },
-    },
-    additionalProperties: false,
-    oneOf: [{ required: ['project_id'] }, { required: ['project_path'] }],
-  },
-};
+// ProjectBindSchema 已被移除，使用 connect_project 工具代替
 
 /**
  * Project Info 工具 Schema
@@ -595,7 +566,7 @@ export const ToolSchemas = {
   current_task_modify: CurrentTaskModifySchema,
   current_task_complete: CurrentTaskCompleteSchema,
   current_task_log: CurrentTaskLogSchema,
-  project_bind: ProjectBindSchema,
+  // project_bind: ProjectBindSchema, // 已移除，使用 connect_project 代替
   project_info: ProjectInfoSchema,
   task_list: TaskListSchema,
   task_switch: TaskSwitchSchema,
@@ -639,7 +610,8 @@ export function getTaskToolDefinitions() {
  * 获取项目管理工具定义列表
  */
 export function getProjectToolDefinitions() {
-  const projectTools = ['project_bind', 'project_info'] as const;
+  // 移除 project_bind，仅保留 project_info
+  const projectTools = ['project_info'] as const;
 
   return projectTools.map((toolName) => {
     const schema = ToolSchemas[toolName];

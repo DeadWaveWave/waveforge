@@ -422,27 +422,16 @@ export class ConnectProjectTool extends BaseHandshakeTool {
 
   /**
    * 执行项目连接逻辑
+   * 使用 ProjectManager.connectProject 而不是旧的 bindProject
    */
   private async connectProject(
     params: ConnectParams
   ): Promise<ConnectionResult> {
     try {
-      if (params.root) {
-        // 通过绝对路径连接（优先级最高）
-        return await this.connectByRoot(params.root);
-      } else if (params.slug) {
-        // 通过 slug 连接
-        return await this.connectBySlug(params.slug);
-      } else if (params.repo) {
-        // 通过仓库地址连接
-        return await this.connectByRepo(params.repo);
-      } else {
-        return {
-          connected: false,
-          error: ErrorCode.INVALID_ROOT,
-          message: '未提供有效的连接参数',
-        };
-      }
+      // 直接使用 ProjectManager 的新 connectProject 方法
+      // 这会调用 EnhancedProjectRegistry.connectProject
+      const result = await this.projectManager.connectProject(params);
+      return result;
     } catch (error) {
       return {
         connected: false,
@@ -452,118 +441,9 @@ export class ConnectProjectTool extends BaseHandshakeTool {
     }
   }
 
-  /**
-   * 通过绝对路径连接项目
-   */
-  private async connectByRoot(root: string): Promise<ConnectionResult> {
-    try {
-      // 使用现有的 ProjectManager.bindProject 方法
-      const bindResult = await this.projectManager.bindProject({
-        project_path: root,
-      });
-
-      return {
-        connected: true,
-        project: {
-          id: bindResult.project.id,
-          root: bindResult.project.root,
-          slug: bindResult.project.slug,
-          origin: bindResult.project.origin,
-        },
-      };
-    } catch (error) {
-      if (error instanceof Error) {
-        if (error.message.includes('路径无效')) {
-          return {
-            connected: false,
-            error: ErrorCode.INVALID_ROOT,
-            message: `项目路径无效: ${root}`,
-          };
-        }
-        if (error.message.includes('权限')) {
-          return {
-            connected: false,
-            error: ErrorCode.MISSING_PERMISSIONS,
-            message: `项目路径权限不足: ${root}`,
-          };
-        }
-      }
-
-      return {
-        connected: false,
-        error: ErrorCode.NOT_FOUND,
-        message: error instanceof Error ? error.message : String(error),
-      };
-    }
-  }
-
-  /**
-   * 通过 slug 连接项目
-   */
-  private async connectBySlug(slug: string): Promise<ConnectionResult> {
-    try {
-      // 从项目注册表查找匹配的项目
-      const projectRegistry = this.projectManager.getProjectRegistry();
-      const candidates = await projectRegistry.findProjects({ slug });
-
-      if (candidates.length === 0) {
-        return {
-          connected: false,
-          error: ErrorCode.NOT_FOUND,
-          message: `未找到 slug 为 "${slug}" 的项目`,
-        };
-      }
-
-      if (candidates.length > 1) {
-        return {
-          connected: false,
-          error: ErrorCode.MULTIPLE_CANDIDATES,
-          message: `找到多个 slug 匹配 "${slug}" 的项目，请使用具体的项目路径`,
-          candidates: candidates.map((c) => ({
-            id: c.id,
-            root: c.root,
-            slug: c.slug,
-            origin: c.origin,
-          })),
-        };
-      }
-
-      // 使用找到的项目进行连接
-      const project = candidates[0];
-      const bindResult = await this.projectManager.bindProject({
-        project_id: project.id,
-      });
-
-      return {
-        connected: true,
-        project: {
-          id: bindResult.project.id,
-          root: bindResult.project.root,
-          slug: bindResult.project.slug,
-          origin: bindResult.project.origin,
-        },
-      };
-    } catch (error) {
-      return {
-        connected: false,
-        error: ErrorCode.NOT_FOUND,
-        message: error instanceof Error ? error.message : String(error),
-      };
-    }
-  }
-
-  /**
-   * 通过仓库地址连接项目
-   */
-  private async connectByRepo(_repo: string): Promise<ConnectionResult> {
-    // TODO: 实现通过仓库地址查找项目的逻辑
-    // 这需要在项目注册表中添加按 origin 查找的功能
-    return {
-      connected: false,
-      error: ErrorCode.NOT_FOUND,
-      message: '通过仓库地址连接项目的功能尚未实现',
-    };
-  }
+  // 注意：以下方法已被移除，因为我们现在直接使用 ProjectManager.connectProject
+  // 这些方法使用了旧的 bindProject 逻辑，导致与 project_bind 共享问题
+  // connectByRoot, connectBySlug, connectByRepo 现在由 EnhancedProjectRegistry 处理
 
   /**
    * 获取错误恢复指引
@@ -618,7 +498,7 @@ export class ConnectProjectTool extends BaseHandshakeTool {
     return {
       name: 'connect_project',
       description:
-        '连接项目到当前会话。支持通过绝对路径、项目 slug 或仓库地址连接。连接成功后才能使用其他任务管理工具。',
+        '连接项目到当前会话。支持通过绝对路径、项目 slug 或仓库地址连接。连接成功后才能使用其他任务管理工具。参数 root/project_path/slug/repo 至少提供一个。',
       inputSchema: {
         type: 'object' as const,
         properties: {
@@ -639,13 +519,9 @@ export class ConnectProjectTool extends BaseHandshakeTool {
             description: '项目仓库地址',
           },
         },
+        // 移除 anyOf，改为更简单的定义
+        // 某些 MCP 客户端（Cursor/Kiro）不支持 anyOf 语法
         additionalProperties: false,
-        anyOf: [
-          { required: ['root'] },
-          { required: ['project_path'] },
-          { required: ['slug'] },
-          { required: ['repo'] },
-        ],
       },
     };
   }

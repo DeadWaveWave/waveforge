@@ -4,6 +4,7 @@
  */
 
 import { ProjectRegistry } from './project-registry.js';
+import { EnhancedProjectRegistry } from './enhanced-project-registry.js';
 import { logger } from './logger.js';
 import {
   LogCategory,
@@ -13,6 +14,8 @@ import {
   type ProjectBindParams,
   type ProjectBindResponse,
   type ProjectInfoResponse,
+  type ConnectParams,
+  type ConnectionResult,
 } from '../types/index.js';
 
 /**
@@ -21,14 +24,17 @@ import {
  */
 export class ProjectManager {
   private projectRegistry: ProjectRegistry;
+  private enhancedRegistry: EnhancedProjectRegistry;
   private activeBinding: ActiveProjectBinding | null = null;
 
   constructor() {
     this.projectRegistry = new ProjectRegistry();
+    this.enhancedRegistry = new EnhancedProjectRegistry();
   }
 
   /**
    * 绑定项目到当前连接
+   * @deprecated 使用 connectProject() 代替，该方法仅为向后兼容保留
    */
   async bindProject(params: ProjectBindParams): Promise<ProjectBindResponse> {
     try {
@@ -186,6 +192,34 @@ export class ProjectManager {
    */
   getProjectRegistry(): ProjectRegistry {
     return this.projectRegistry;
+  }
+
+  /**
+   * 获取增强项目注册表实例（用于连接管理）
+   */
+  getEnhancedRegistry(): EnhancedProjectRegistry {
+    return this.enhancedRegistry;
+  }
+
+  /**
+   * 使用新的连接方式连接项目（推荐）
+   * 使用 EnhancedProjectRegistry 而不是旧的 bindProject
+   */
+  async connectProject(params: ConnectParams): Promise<ConnectionResult> {
+    const result = await this.enhancedRegistry.connectProject(params);
+
+    // 如果连接成功，同步更新活跃绑定
+    if (result.connected && result.project) {
+      this.activeBinding = {
+        project_id: result.project.id,
+        root: result.project.root,
+        slug: result.project.slug,
+        origin: result.project.origin,
+        bound_at: new Date().toISOString(),
+      };
+    }
+
+    return result;
   }
 
   // 私有方法

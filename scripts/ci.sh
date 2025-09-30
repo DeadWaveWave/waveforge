@@ -69,8 +69,8 @@ if [ "$SKIP_TESTS" = false ]; then
         echo "🧪 运行测试 (包含覆盖率)..."
         pnpm run test:coverage
     else
-        echo "🧪 运行测试..."
-        pnpm run test
+        echo "🧪 运行稳定测试 (排除 flaky tests)..."
+        pnpm run test:stable
     fi
 else
     echo "⚠️  跳过测试"

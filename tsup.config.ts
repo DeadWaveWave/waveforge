@@ -41,26 +41,9 @@ export default defineConfig([
     target: 'node18',
     outDir: 'dist',
     splitting: false,
-    bundle: false,
+    bundle: true, // 改为 bundle 模式避免路径问题
     external: ['@modelcontextprotocol/sdk', 'ulid', 'fs-extra'],
     outExtension: () => ({ js: '.js' }),
     tsconfig: 'tsconfig.json',
-    // 修复导入路径，指向 esm 目录
-    esbuildOptions(options) {
-      options.plugins = options.plugins || [];
-      options.plugins.push({
-        name: 'fix-imports',
-        setup(build) {
-          build.onResolve({ filter: /^\.\/.*/ }, (args) => {
-            if (args.path.startsWith('./')) {
-              return {
-                path: args.path.replace('./', './esm/'),
-                external: true,
-              };
-            }
-          });
-        },
-      });
-    },
   },
 ]);
