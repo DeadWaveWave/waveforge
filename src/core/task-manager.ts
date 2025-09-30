@@ -11,6 +11,7 @@ import { logger } from './logger.js';
 import { MultiTaskDirectoryManager } from './multi-task-directory-manager.js';
 import { DataMigrationTool } from './data-migration-tool.js';
 import { EVRValidator, createEVRValidator } from './evr-validator.js';
+import { LazySync, createLazySync } from './lazy-sync.js';
 import {
   TaskStatus,
   LogLevel,
@@ -20,6 +21,7 @@ import {
   type TaskPlan,
   type TaskStep,
   type TaskLog,
+  type SyncPreview,
 } from '../types/index.js';
 
 /**
@@ -85,6 +87,12 @@ export interface TaskUpdateResult {
     step?: string[];
   };
   logs_highlights?: TaskLog[];
+  // EVR 相关字段
+  evr_for_node?: string[];
+  evr_pending?: boolean;
+  evr_for_plan?: string[];
+  // Lazy 同步相关字段
+  sync_preview?: SyncPreview;
 }
 
 /**
@@ -134,6 +142,7 @@ export class TaskManager {
   private multiTaskDirectoryManager: MultiTaskDirectoryManager;
   private dataMigrationTool: DataMigrationTool;
   private evrValidator: EVRValidator;
+  private lazySync: LazySync;
   private migrationChecked: boolean = false;
 
   constructor(
@@ -152,6 +161,7 @@ export class TaskManager {
     );
     this.dataMigrationTool = new DataMigrationTool(this.docsPath);
     this.evrValidator = createEVRValidator();
+    this.lazySync = createLazySync();
   }
 
   getDocsPath(): string {
@@ -367,6 +377,91 @@ export class TaskManager {
   }
 
   /**
+   * 执行 Lazy 同步
+   */
+  private async performLazySync(task: CurrentTask): Promise<any | null> {
+    try {
+      const panelPath = this.getCurrentTaskPanelPath();
+      if (!panelPath) {
+        // 没有面板文件，无需同步
+        return null;
+      }
+
+      // 读取面板内容
+      const panelContent = await fs.readFile(panelPath, 'utf8');
+      if (!panelContent || panelContent.trim() === '') {
+        return null;
+      }
+
+      // 检测差异
+      const diff = this.lazySync.detectDifferences(panelContent, task as any);
+      if (!diff.hasChanges || diff.contentChanges.length === 0) {
+        // 没有可写的内容变更，无需同步
+        return null;
+      }
+
+      // 应用同步变更
+      const syncResult = await this.lazySync.applySyncChanges(diff, 'etag_first_then_ts');
+
+      // 将变更应用到任务数据
+      this.applyContentChangesToTask(task, syncResult.changes);
+
+      logger.info(LogCategory.Task, LogAction.Update, 'Lazy 同步完成', {
+        changesCount: syncResult.changes.length,
+        conflictsCount: syncResult.conflicts.length,
+        affectedSections: [...new Set(syncResult.changes.map(c => c.section))],
+      });
+
+      return syncResult;
+    } catch (error) {
+      logger.error(LogCategory.Task, LogAction.Handle, 'Lazy 同步失败', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      // 同步失败不应该阻止主流程
+      return null;
+    }
+  }
+
+  /**
+   * 将内容变更应用到任务数据
+   */
+  private applyContentChangesToTask(task: CurrentTask, changes: any[]): void {
+    for (const change of changes) {
+      try {
+        // 根据变更类型应用到任务数据
+        if (change.section.startsWith('plan-')) {
+          const planId = change.section;
+          const plan = task.overall_plan.find(p => p.id === planId);
+          if (plan && change.field === 'description') {
+            plan.description = change.newValue;
+          }
+        } else if (change.section.startsWith('evr-')) {
+          const evrId = change.section;
+          const evr = task.expectedResults?.find(e => e.id === evrId);
+          if (evr) {
+            if (change.field === 'title') {
+              evr.title = change.newValue;
+            } else if (change.field === 'verify') {
+              evr.verify = change.newValue;
+            } else if (change.field === 'expect') {
+              evr.expect = change.newValue;
+            }
+          }
+        } else if (change.section === 'hints') {
+          if (Array.isArray(change.newValue)) {
+            task.task_hints = change.newValue;
+          }
+        }
+      } catch (error) {
+        logger.error(LogCategory.Task, LogAction.Handle, '应用内容变更失败', {
+          change,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  }
+
+  /**
    * 更新任务状态
    */
   async updateTaskStatus(params: TaskUpdateParams): Promise<TaskUpdateResult> {
@@ -377,6 +472,9 @@ export class TaskManager {
       if (!task) {
         throw new Error('当前没有活跃的任务');
       }
+
+      // 执行 Lazy 同步（在状态更新前）
+      const syncResult = await this.performLazySync(task);
 
       const timestamp = new Date().toISOString();
       let result: TaskUpdateResult = { success: true };
@@ -394,6 +492,29 @@ export class TaskManager {
 
       // 添加提示信息
       result.hints = this.getActiveHints(task, params);
+
+      // 添加同步预览信息（如果有变更）
+      if (syncResult && syncResult.changes.length > 0) {
+        result.sync_preview = {
+          applied: true,
+          changes: syncResult.changes.map((change: any) => ({
+            type: 'content' as const,
+            section: change.section,
+            field: change.field,
+            oldValue: change.oldValue,
+            newValue: change.newValue,
+            source: change.source,
+          })),
+          conflicts: syncResult.conflicts.map((conflict: any) => ({
+            region: conflict.region,
+            field: conflict.field,
+            reason: conflict.reason,
+            oursTs: conflict.oursTs,
+            theirsTs: conflict.theirsTs,
+          })),
+          affectedSections: [...new Set(syncResult.changes.map((c: any) => c.section))] as string[],
+        };
+      }
 
       return result;
     } catch (error) {
@@ -718,6 +839,8 @@ export class TaskManager {
       status: TaskStatus.ToDo,
       hints: [],
       steps: [],
+      evrBindings: [],
+      contextTags: [],
       created_at: timestamp,
     };
   }
@@ -990,6 +1113,22 @@ export class TaskManager {
       throw new Error('状态转换无效：不能从阻塞状态直接转换到完成状态');
     }
 
+    // 计划级门槛检查：尝试完成计划时检查 EVR 就绪性
+    if (params.status === TaskStatus.Completed && plan.evrBindings?.length > 0) {
+      const allEVRs = task.expectedResults || [];
+      
+      const gateResult = this.evrValidator.checkPlanGate(plan.id, allEVRs);
+      if (!gateResult.canComplete) {
+        // 阻止计划完成，返回 evr_pending
+        return {
+          success: false,
+          current_plan_id: task.current_plan_id,
+          evr_pending: true,
+          evr_for_plan: gateResult.pendingEVRs || [],
+        };
+      }
+    }
+
     if (params.status) {
       plan.status = params.status;
     }
@@ -1061,12 +1200,19 @@ export class TaskManager {
       }
     }
 
+    // EVR 引导：当计划从 to_do 切换到 in_progress 时返回绑定的 EVR
+    let evrForNode: string[] | undefined;
+    if (params.status === TaskStatus.InProgress && plan.evrBindings?.length > 0) {
+      evrForNode = plan.evrBindings;
+    }
+
     return {
       success: true,
       current_plan_id: task.current_plan_id,
       steps_required: stepsRequired,
       auto_advanced: autoAdvanced,
       started_new_plan: startedNewPlan,
+      evr_for_node: evrForNode,
     };
   }
 
@@ -1148,6 +1294,10 @@ export class TaskManager {
 
     // 处理每个 EVR 更新项
     for (const item of params.evr.items) {
+      // 验证必需字段
+      if (!item.status || !item.last_run) {
+        throw new Error(`EVR 更新项缺少必需字段: evr_id=${item.evr_id}`);
+      }
       // 查找现有的 EVR
       let existingEVR = task.expectedResults.find(
         (evr) => evr.id === item.evr_id
@@ -1190,7 +1340,7 @@ export class TaskManager {
         level: LogLevel.Info,
         category: LogCategory.Test,
         action: LogAction.Update,
-        message: `EVR ${item.evr_id}: ${highlightCategory}`,
+        message: `EVR ${item.evr_id} ${highlightCategory}`,
         ai_notes: item.notes,
         details: {
           evr_id: item.evr_id,
@@ -1221,6 +1371,9 @@ export class TaskManager {
       success: true,
       current_plan_id: task.current_plan_id,
       logs_highlights: logsHighlights,
+      auto_advanced: false,
+      steps_required: false,
+      started_new_plan: false,
     };
   }
 
@@ -1616,6 +1769,8 @@ export class TaskManager {
       description: description.trim(),
       status: TaskStatus.ToDo,
       hints: [],
+      usesEVR: [],
+      contextTags: [],
       created_at: timestamp,
     }));
 

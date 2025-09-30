@@ -484,6 +484,7 @@ describe('WaveForge MCP 服务器集成测试', () => {
       expect(errorResponse).toEqual({
         success: false,
         error: '工具名称不能为空',
+        error_code: 'VALIDATION_ERROR',
         type: 'VALIDATION_ERROR',
         timestamp: expect.any(String),
         stack: expect.any(String),

@@ -194,6 +194,10 @@ export interface TaskStep {
   notes?: string;
   /** 步骤级用户提示 */
   hints: string[];
+  /** 只读引用的 EVR IDs */
+  usesEVR: string[];
+  /** 上下文标签 */
+  contextTags: ContextTag[];
   /** 创建时间 (ISO 8601) */
   created_at: string;
   /** 完成时间 (ISO 8601)（可选） */
@@ -219,6 +223,10 @@ export interface TaskPlan {
   hints: string[];
   /** 该计划下的具体步骤 */
   steps: TaskStep[];
+  /** 绑定的 EVR IDs */
+  evrBindings: string[];
+  /** 上下文标签 */
+  contextTags: ContextTag[];
   /** 创建时间 (ISO 8601) */
   created_at: string;
   /** 完成时间 (ISO 8601)（可选） */

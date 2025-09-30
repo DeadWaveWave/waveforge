@@ -259,12 +259,16 @@ export class FakeTaskStore {
         description: '实现基础功能',
         status: TaskStatus.InProgress,
         hints: ['使用 TDD 方式开发'],
+        evrBindings: [],
+        contextTags: [],
         steps: [
           {
             id: 'step-1-1',
             description: '创建核心类型定义',
             status: TaskStatus.Completed,
             hints: [],
+            usesEVR: [],
+            contextTags: [],
             created_at: new Date().toISOString(),
           },
           {
@@ -272,6 +276,8 @@ export class FakeTaskStore {
             description: '实现主要逻辑',
             status: TaskStatus.InProgress,
             hints: ['注意错误处理'],
+            usesEVR: [],
+            contextTags: [],
             created_at: new Date().toISOString(),
           },
         ],
@@ -282,12 +288,16 @@ export class FakeTaskStore {
         description: '编写测试用例',
         status: TaskStatus.ToDo,
         hints: [],
+        evrBindings: [],
+        contextTags: [],
         steps: [
           {
             id: 'step-2-1',
             description: '单元测试',
             status: TaskStatus.ToDo,
             hints: [],
+            usesEVR: [],
+            contextTags: [],
             created_at: new Date().toISOString(),
           },
           {
@@ -295,6 +305,8 @@ export class FakeTaskStore {
             description: '集成测试',
             status: TaskStatus.ToDo,
             hints: [],
+            usesEVR: [],
+            contextTags: [],
             created_at: new Date().toISOString(),
           },
         ],

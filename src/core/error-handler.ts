@@ -422,6 +422,7 @@ export class ErrorHandler {
     const response: {
       success: false;
       error: string;
+      error_code?: string;
       type: string;
       timestamp: string;
       context?: Record<string, any>;
@@ -433,6 +434,17 @@ export class ErrorHandler {
       timestamp: waveForgeError.timestamp,
       context: this.sanitizeContext(waveForgeError.context),
     };
+
+    // 添加错误码（基于错误类型）
+    if (waveForgeError.type === ErrorType.SyncError) {
+      response.error_code = 'SYNC_CONFLICT';
+    } else if (waveForgeError.type === ErrorType.ValidationError) {
+      response.error_code = 'VALIDATION_ERROR';
+    } else if (waveForgeError.type === ErrorType.NotFound) {
+      response.error_code = 'NOT_FOUND';
+    } else if (waveForgeError.type === ErrorType.EVRError) {
+      response.error_code = 'EVR_ERROR';
+    }
 
     // 根据配置决定是否包含堆栈跟踪
     if (this.config.includeStackTrace && waveForgeError.stack) {

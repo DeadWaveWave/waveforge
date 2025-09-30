@@ -254,6 +254,12 @@ export class CurrentTaskUpdateTool extends BaseTaskTool {
         started_new_plan: result.started_new_plan,
         hints: result.hints,
         logs_highlights: result.logs_highlights,
+        // EVR 相关字段
+        evr_for_node: result.evr_for_node,
+        evr_pending: result.evr_pending,
+        evr_for_plan: result.evr_for_plan,
+        // Lazy 同步相关字段
+        sync_preview: result.sync_preview,
       });
     } catch (error) {
       this.logOperation(

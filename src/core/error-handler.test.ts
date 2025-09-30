@@ -151,6 +151,7 @@ describe('ErrorHandler', () => {
       expect(result).toEqual({
         success: false,
         error: '参数无效',
+        error_code: 'VALIDATION_ERROR',
         type: ErrorType.ValidationError,
         timestamp: expect.any(String),
         context: { field: 'name' },
