@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ProjectManager } from '../core/project-manager.js';
 import { TaskManager } from '../core/task-manager.js';
-import { LazySync, createLazySync } from '../core/lazy-sync.js';
+// import { LazySync, createLazySync } from '../core/lazy-sync.js';
 import { ConnectProjectTool } from '../tools/handshake-tools.js';
 import {
   CurrentTaskInitTool,
@@ -15,7 +15,7 @@ import {
   CurrentTaskModifyTool,
   CurrentTaskUpdateTool,
 } from '../tools/task-tools.js';
-import { TaskStatus, type TaskData } from '../types/index.js';
+import { TaskStatus } from '../types/index.js';
 import * as fs from 'fs-extra';
 import * as path from 'path';
 import * as os from 'os';
@@ -24,7 +24,7 @@ describe('任务 14：同步流程集成测试', () => {
   let tempDir: string;
   let projectManager: ProjectManager;
   let taskManager: TaskManager;
-  let lazySync: LazySync;
+  // let lazySync: LazySync;
   let panelPath: string;
 
   beforeEach(async () => {
@@ -33,10 +33,7 @@ describe('任务 14：同步流程集成测试', () => {
 
     projectManager = new ProjectManager();
     taskManager = new TaskManager(path.join(tempDir, '.wave'), projectManager);
-    lazySync = createLazySync({
-      enableRequestCache: true,
-      enableAuditLog: true,
-    });
+    // lazySync = createLazySync({ enableRequestCache: true, enableAuditLog: true });
 
     // 连接项目
     const connectTool = new ConnectProjectTool(projectManager, taskManager);
@@ -104,7 +101,7 @@ describe('任务 14：同步流程集成测试', () => {
       expect(finalResponse.task.goal).toBe('更新后的目标');
     });
 
-    it('应该区分内容变更和状态变更，状态变更不直接回写', async () => {
+    it('应该区分内容变更和状态变更，状态变更不直接回写（read 为 dry-run）', async () => {
       // Given: 创建带计划的任务
       const initTool = new CurrentTaskInitTool(taskManager);
       await initTool.handle({
@@ -124,7 +121,7 @@ describe('任务 14：同步流程集成测试', () => {
       );
 
       // 修改状态：尝试将计划标记为完成（[ ] → [x]）
-      panelContent = panelContent.replace('- [ ] 待执行计划', '- [x] 待执行计划');
+      panelContent = panelContent.replace('1. [ ] 待执行计划', '1. [x] 待执行计划');
 
       await fs.writeFile(panelPath, panelContent, 'utf-8');
 
@@ -135,8 +132,8 @@ describe('任务 14：同步流程集成测试', () => {
 
       expect(readResponse.success).toBe(true);
 
-      // 内容变更应该被检测
-      expect(readResponse.task.title).toBe('修改后的标题');
+      // read 为 dry-run，内容变更此时不生效
+      expect(readResponse.task.title).toBe('状态隔离测试');
 
       // 状态变更应该被识别为待定（不直接回写）
       // 计划状态仍应该是 to_do，而不是 completed
@@ -145,6 +142,15 @@ describe('任务 14：同步流程集成测试', () => {
       );
       expect(plan).toBeDefined();
       expect(plan.status).toBe(TaskStatus.ToDo); // 不是 completed
+
+      // 预览中应包含内容变更与状态变更
+      expect(readResponse.panel_pending).toBe(true);
+      expect(readResponse.sync_preview).toBeDefined();
+      const previewCheck = readResponse.sync_preview;
+      const contentChanges = previewCheck.changes.filter((c: any) => c.type === 'content');
+      const statusChanges = previewCheck.changes.filter((c: any) => c.type === 'status' || c.field === 'status');
+      expect(contentChanges.length).toBeGreaterThan(0);
+      expect(statusChanges.length).toBeGreaterThan(0);
 
       // When: 通过 API 正式更新状态
       const updateTool = new CurrentTaskUpdateTool(taskManager);
@@ -155,9 +161,10 @@ describe('任务 14：同步流程集成测试', () => {
         notes: '通过 API 更新状态',
       });
 
-      // Then: 状态现在应该生效
+      // Then: 状态现在应该生效，同时内容变更也会被懒同步应用
       const finalRead = await readTool.handle();
       const finalResponse = JSON.parse(finalRead.content[0].text);
+      expect(finalResponse.task.title).toBe('修改后的标题');
       const updatedPlan = finalResponse.task.overall_plan.find(
         (p: any) => p.id === plan.id
       );
@@ -181,7 +188,7 @@ describe('任务 14：同步流程集成测试', () => {
       await fs.writeFile(panelPath, modifiedContent, 'utf-8');
 
       // 记录同步次数（通过监听文件修改时间）
-      const initialMtime = (await fs.stat(panelPath)).mtime.getTime();
+      // const initialMtime = (await fs.stat(panelPath)).mtime.getTime();
 
       // When: 连续调用三次不同的工具
       const readTool = new CurrentTaskReadTool(taskManager);
@@ -245,9 +252,7 @@ describe('任务 14：同步流程集成测试', () => {
 
       // 读取当前任务数据和 ETag
       const readTool = new CurrentTaskReadTool(taskManager);
-      const read1 = await readTool.handle();
-      const read1Response = JSON.parse(read1.content[0].text);
-      const originalEtag = read1Response.md_version;
+      // 预读 ETag 可选（此处不强制使用）
 
       // When: 构造双端冲突
       // 端 A：用户手动编辑面板
@@ -391,23 +396,23 @@ describe('任务 14：同步流程集成测试', () => {
       // When: 用户在面板中修改多个状态
       let panelContent = await fs.readFile(panelPath, 'utf-8');
 
-      // 修改所有计划的状态
+      // 修改所有计划的状态（注意：面板使用序号格式 "1. [ ]" 而不是 "- [ ]"）
       panelContent = panelContent.replace(
-        /- \[ \] 计划 1/g,
-        '- [-] 计划 1'
+        /1\. \[ \] 计划 1/g,
+        '1. [-] 计划 1'
       ); // to_do → in_progress
       panelContent = panelContent.replace(
-        /- \[ \] 计划 2/g,
-        '- [x] 计划 2'
+        /2\. \[ \] 计划 2/g,
+        '2. [x] 计划 2'
       ); // to_do → completed
       panelContent = panelContent.replace(
-        /- \[ \] 计划 3/g,
-        '- [!] 计划 3'
+        /3\. \[ \] 计划 3/g,
+        '3. [!] 计划 3'
       ); // to_do → blocked
 
       await fs.writeFile(panelPath, panelContent, 'utf-8');
 
-      // Then: 读取时状态应该保持原样（pending），只有内容变更生效
+      //  Then: 读取时状态应该保持原样（pending），只有内容变更生效
       const readTool = new CurrentTaskReadTool(taskManager);
       const readResult = await readTool.handle();
       const readResponse = JSON.parse(readResult.content[0].text);
@@ -419,15 +424,16 @@ describe('任务 14：同步流程集成测试', () => {
         expect(plan.status).toBe(TaskStatus.ToDo);
       }
 
-      // 但应该提示有 pending 的状态变更
-      if (readResponse.panel_pending && readResponse.sync_preview) {
-        const statusChanges = readResponse.sync_preview.changes.filter(
-          (c: any) => c.type === 'status' || c.field === 'status'
-        );
+      // 应该检测到 pending 的状态变更
+      expect(readResponse.panel_pending).toBe(true);
+      expect(readResponse.sync_preview).toBeDefined();
 
-        // 应该检测到状态变更（但不应用）
-        expect(statusChanges.length).toBeGreaterThan(0);
-      }
+      const statusChanges = readResponse.sync_preview.changes.filter(
+        (c: any) => c.type === 'status' || c.field === 'status'
+      );
+
+      // 应该检测到状态变更（但不应用）
+      expect(statusChanges.length).toBeGreaterThan(0);
 
       // When: 通过 API 逐一确认状态变更
       const updateTool = new CurrentTaskUpdateTool(taskManager);
@@ -464,7 +470,7 @@ describe('任务 14：同步流程集成测试', () => {
       );
     });
 
-    it('应该区分可回写字段和不可回写字段', async () => {
+    it('应该区分可回写字段和不可回写字段（read 为 dry-run，modify/update 才应用）', async () => {
       // Given: 创建任务
       const initTool = new CurrentTaskInitTool(taskManager);
       await initTool.handle({
@@ -486,22 +492,45 @@ describe('任务 14：同步流程集成测试', () => {
       panelContent = panelContent.replace('测试计划', '修改后的计划文本');
 
       // 2. 不可回写字段：状态（复选框）
-      panelContent = panelContent.replace(/- \[ \] 修改后的计划文本/, '- [x] 修改后的计划文本');
+      panelContent = panelContent.replace(/1\. \[ \] 修改后的计划文本/, '1. [x] 修改后的计划文本');
 
       await fs.writeFile(panelPath, panelContent, 'utf-8');
 
-      // Then: 读取时验证回写结果
+      // Then: 首次读取仅预览（不回写）
       const readTool = new CurrentTaskReadTool(taskManager);
       const readResult = await readTool.handle();
       const readResponse = JSON.parse(readResult.content[0].text);
 
-      // 可回写字段应该生效
-      expect(readResponse.task.title).toBe('修改后的标题');
-      expect(readResponse.task.goal).toBe('修改后的目标');
-      expect(readResponse.task.overall_plan[0].text).toBe('修改后的计划文本');
+      // 可回写字段暂不生效（dry-run）
+      expect(readResponse.task.title).toBe('字段回写测试');
+      expect(readResponse.task.goal).toBe('验证哪些字段可以回写');
+      expect(readResponse.task.overall_plan[0].text).toBe('测试计划');
 
-      // 不可回写字段（状态）应该保持原样
-      expect(readResponse.task.overall_plan[0].status).toBe(TaskStatus.ToDo);
+      // 预览中包含内容与状态变更
+      expect(readResponse.panel_pending).toBe(true);
+      expect(readResponse.sync_preview).toBeDefined();
+      const preview = readResponse.sync_preview;
+      const contentChanges = preview.changes.filter((c: any) => c.type === 'content');
+      const statusChanges = preview.changes.filter((c: any) => c.type === 'status' || c.field === 'status');
+      expect(contentChanges.length).toBeGreaterThan(0);
+      expect(statusChanges.length).toBeGreaterThan(0);
+
+      // When: 通过 modify 应用内容
+      const modifyTool = new CurrentTaskModifyTool(taskManager);
+      await modifyTool.handle({
+        field: 'plan',
+        content: ['修改后的计划文本'],
+        reason: '同步内容变更',
+        change_type: 'plan_adjustment',
+      });
+
+      // Then: 再次读取，内容变更应生效；状态仍保持 ToDo（未通过 update）
+      const read2 = await readTool.handle();
+      const read2Response = JSON.parse(read2.content[0].text);
+      expect(read2Response.task.title).toBe('修改后的标题');
+      expect(read2Response.task.goal).toBe('修改后的目标');
+      expect(read2Response.task.overall_plan[0].text).toBe('修改后的计划文本');
+      expect(read2Response.task.overall_plan[0].status).toBe(TaskStatus.ToDo);
     });
   });
 });

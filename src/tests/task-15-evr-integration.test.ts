@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { ProjectManager } from '../core/project-manager.js';
 import { TaskManager } from '../core/task-manager.js';
-import { EVRValidator, createEVRValidator } from '../core/evr-validator.js';
+// import { EVRValidator, createEVRValidator } from '../core/evr-validator.js';
 import { ConnectProjectTool } from '../tools/handshake-tools.js';
 import {
   CurrentTaskInitTool,
@@ -25,14 +25,14 @@ describe('任务 15：EVR 生命周期集成测试', () => {
   let tempDir: string;
   let projectManager: ProjectManager;
   let taskManager: TaskManager;
-  let evrValidator: EVRValidator;
+  // let evrValidator: EVRValidator;
 
   beforeEach(async () => {
     tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'task15-evr-'));
 
     projectManager = new ProjectManager();
     taskManager = new TaskManager(path.join(tempDir, '.wave'), projectManager);
-    evrValidator = createEVRValidator();
+    // evrValidator = createEVRValidator();
 
     // 连接项目
     const connectTool = new ConnectProjectTool(projectManager, taskManager);

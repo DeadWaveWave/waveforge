@@ -5,6 +5,7 @@
  */
 
 import { logger } from './logger.js';
+import { createHash } from 'crypto';
 import {
   LogCategory,
   LogAction,
@@ -29,6 +30,8 @@ export interface PanelRenderOptions {
   indentString: string;
   /** 渲染器版本 */
   rendererVersion: string;
+  /** 是否在文档头部注入 Front Matter（md_version/last_modified） */
+  includeFrontMatter: boolean;
 }
 
 /**
@@ -39,6 +42,7 @@ const DEFAULT_RENDER_OPTIONS: PanelRenderOptions = {
   collapseArrays: true,
   indentString: '  ',
   rendererVersion: '1.0.0',
+  includeFrontMatter: false,
 };
 
 /**
@@ -127,11 +131,26 @@ export class PanelRenderer {
       sections.push(this.renderLogs(data.logs));
     }
 
-    let result = sections.join('\n');
+    let body = sections.join('\n');
 
     // 注入稳定锚点
     if (this.options.injectAnchors) {
-      result = this.injectStableAnchors(result);
+      body = this.injectStableAnchors(body);
+    }
+
+    // 可选：注入 Front Matter（md_version / last_modified）
+    let result = body;
+    if (this.options.includeFrontMatter) {
+      const mdVersion = this.computeMdVersion(body);
+      const lastModified = new Date().toISOString();
+      const fm = [
+        '---',
+        `md_version: ${mdVersion}`,
+        `last_modified: ${lastModified}`,
+        '---',
+        '',
+      ].join('\n');
+      result = fm + body;
     }
 
     logger.info(LogCategory.Task, LogAction.Create, '面板渲染完成', {
@@ -142,6 +161,13 @@ export class PanelRenderer {
     });
 
     return result;
+  }
+
+  /**
+   * 基于内容计算 md_version（ETag）
+   */
+  private computeMdVersion(content: string): string {
+    return createHash('md5').update(content).digest('hex');
   }
 
   /**

@@ -30,7 +30,7 @@ export class MultiTaskDirectoryManager {
     }
     this.docsPath = docsPath.trim();
     this.tasksBasePath = path.join(this.docsPath, 'tasks');
-    this.panelRenderer = createPanelRenderer();
+    this.panelRenderer = createPanelRenderer({ includeFrontMatter: true });
   }
 
   /**

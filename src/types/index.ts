@@ -1433,6 +1433,8 @@ export interface PanelMetadata {
   parsedAt: string;
   /** 面板版本/ETag */
   version?: string;
+  /** 面板逻辑修改时间（来自 front matter） */
+  lastModified?: string;
   /** 解析器版本 */
   parserVersion: string;
   /** 解析统计 */

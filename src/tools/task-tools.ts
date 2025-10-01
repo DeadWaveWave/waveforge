@@ -34,7 +34,6 @@ import {
   TaskStatus,
   LogCategory,
   LogAction,
-  SyncConflictType,
   type EVRSummary,
   type EVRDetail,
   type SyncPreview,
@@ -495,32 +494,70 @@ export class CurrentTaskReadTool extends BaseTaskTool {
         return { hasPendingChanges: false };
       }
 
-      // 使用 LazySync 检测差异（干运行模式）
-      const diff = this.lazySync.detectDifferences(panelContent, task);
+      // 将 CurrentTask 转换为 LazySync 期望的 TaskData 结构（仅预览用）
+      const taskData: any = {
+        id: task.id,
+        title: task.title,
+        goal: task.goal,
+        requirements: task.goal ? [task.goal] : [],
+        issues: [],
+        hints: task.task_hints || [],
+        plans: task.overall_plan || [],
+        expectedResults: task.expectedResults || [],
+        createdAt: task.created_at,
+        updatedAt: task.updated_at,
+        projectId: task.project_id || '',
+        // 不在预览中提供 panelModTime，确保 reason 保持 etag_mismatch
+      };
 
-      if (!diff.hasChanges || diff.contentChanges.length === 0) {
+      // 使用 LazySync 检测差异（干运行模式）
+      const diff = this.lazySync.detectDifferences(panelContent, taskData);
+
+      if (!diff.hasChanges) {
         return { hasPendingChanges: false };
       }
 
       // 创建同步预览（applied=false 表示仅预览）
-      const preview: SyncPreview = {
-        applied: false,
-        changes: diff.contentChanges.map((change: any) => ({
+      const changes: any[] = [];
+
+      // 添加内容变更
+      changes.push(
+        ...diff.contentChanges.map((change: any) => ({
           type: 'content' as const,
           section: change.section,
           field: change.field,
           oldValue: change.oldValue,
           newValue: change.newValue,
           source: change.source,
-        })),
-        conflicts: diff.statusChanges.map((stateChange: any) => ({
-          region: stateChange.section,
+        }))
+      );
+
+      // 添加状态变更（标记为 status 类型）
+      changes.push(
+        ...diff.statusChanges.map((stateChange: any) => ({
+          type: 'status' as const,
+          section: stateChange.target === 'plan' ? stateChange.id : `${stateChange.target}:${stateChange.id}`,
           field: 'status',
-          reason: SyncConflictType.ConcurrentUpdate,
-          oursTs: task.updated_at,
-          theirsTs: new Date().toISOString(),
-        })),
-        affectedSections: [...new Set(diff.contentChanges.map((c: any) => c.section))] as string[],
+          oldValue: stateChange.oldStatus,
+          newValue: stateChange.newStatus,
+          source: 'panel' as const,
+        }))
+      );
+
+      // 为了在预览中提供冲突的解决建议，使用引擎计算一次冲突解法
+      // 注意：这里不会持久化任何变更，仅用于生成 resolution 供展示
+      const dryRun = await this.lazySync.applySyncChanges(diff, 'etag_first_then_ts');
+
+      const preview: SyncPreview = {
+        applied: false,
+        changes,
+        conflicts: (dryRun.conflicts as any) || diff.conflicts || [],
+        affectedSections: [
+          ...new Set([
+            ...diff.contentChanges.map((c: any) => c.section),
+            ...diff.statusChanges.map((s: any) => s.id),
+          ]),
+        ] as string[],
       };
 
       return {

@@ -60,6 +60,30 @@ export class PanelParser {
     this.resetParseState();
 
     try {
+      // 提前解析 Front Matter（若存在）
+      let fmVersion: string | undefined;
+      let fmLastModified: string | undefined;
+      const fmMatch = content.match(/^---\n([\s\S]*?)\n---\n/);
+      if (fmMatch) {
+        const yaml = fmMatch[1];
+        for (const rawLine of yaml.split('\n')) {
+          const line = rawLine.trim();
+          if (!line) continue;
+          const idx = line.indexOf(':');
+          if (idx > 0) {
+            const key = line.substring(0, idx).trim();
+            const val = line.substring(idx + 1).trim();
+            if (key === 'md_version' || key === 'version') {
+              fmVersion = val;
+            } else if (key === 'last_modified') {
+              fmLastModified = val;
+            }
+          }
+        }
+        // 去除 front matter 内容再进入预处理
+        content = content.substring(fmMatch[0].length);
+      }
+
       const lines = this.preprocessContent(content);
       const sections = this.identifySections(lines);
 
@@ -73,6 +97,14 @@ export class PanelParser {
         logs: this.extractLogs(sections),
         metadata: this.generateMetadata(),
       };
+
+      // 合并 Front Matter 元数据
+      if (fmVersion) {
+        panel.metadata.version = fmVersion;
+      }
+      if ((panel.metadata as any)) {
+        (panel.metadata as any).lastModified = fmLastModified;
+      }
 
       // 更新元数据统计
       panel.metadata.stats.totalPlans = panel.plans.length;

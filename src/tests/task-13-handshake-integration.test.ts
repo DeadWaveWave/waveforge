@@ -15,7 +15,6 @@ import {
 import {
   CurrentTaskInitTool,
   CurrentTaskReadTool,
-  CurrentTaskUpdateTool,
 } from '../tools/task-tools.js';
 import { ErrorCode } from '../types/index.js';
 import * as fs from 'fs-extra';

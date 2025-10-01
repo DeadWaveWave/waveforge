@@ -186,7 +186,7 @@ export class LazySync {
         structuredData
       );
 
-      // 检测冲突
+      // 检测冲突（仅限内容字段差异）
       const conflicts = this.detectConflicts(parsedPanel, structuredData);
 
       const diff: SyncDiff = {
@@ -504,15 +504,19 @@ export class LazySync {
       });
     }
 
-    // 检测提示变更
+    // 检测提示变更：仅当面板显式提供非空提示，或结构化侧为空时才同步
     if (!this.arraysEqual(parsedPanel.hints, structuredData.hints || [])) {
-      changes.push({
-        section: 'hints',
-        field: 'hints',
-        oldValue: structuredData.hints || [],
-        newValue: parsedPanel.hints,
-        source: 'panel',
-      });
+      const panelHasHints = Array.isArray(parsedPanel.hints) && parsedPanel.hints.length > 0;
+      const structuredHasHints = Array.isArray(structuredData.hints) && structuredData.hints.length > 0;
+      if (panelHasHints || !structuredHasHints) {
+        changes.push({
+          section: 'hints',
+          field: 'hints',
+          oldValue: structuredData.hints || [],
+          newValue: parsedPanel.hints,
+          source: 'panel',
+        });
+      }
     }
 
     // 检测计划内容变更（不包括状态）
@@ -542,6 +546,18 @@ export class LazySync {
         const parsedTaskStatus = this.checkboxStateToTaskStatus(
           parsedPlan.status
         );
+
+        // 添加调试日志（仅在开发环境）
+        if (process.env.NODE_ENV !== 'production') {
+          logger.info(LogCategory.Task, LogAction.Handle, '状态变更检测', {
+            planId: parsedPlan.id,
+            parsedStatus: parsedPlan.status,
+            parsedTaskStatus,
+            structuredStatus: structuredPlan.status,
+            different: parsedTaskStatus !== structuredPlan.status,
+          });
+        }
+
         if (parsedTaskStatus !== structuredPlan.status) {
           changes.push({
             target: 'plan',
@@ -600,8 +616,8 @@ export class LazySync {
   ): SyncConflict[] {
     const conflicts: SyncConflict[] = [];
 
-    // 从 taskData 中获取面板修改时间（由 TaskManager 提供）
-    const panelModTime = (structuredData as any).panelModTime;
+    // 从 front matter 获取逻辑时间戳（优先），否则回退到 TaskManager 提供的文件 mtime
+    const panelModTime = (parsedPanel.metadata as any)?.lastModified || (structuredData as any).panelModTime;
     const structuredModTime = structuredData.updatedAt;
 
     // 检查计划是否有冲突 (只要内容不同就是潜在冲突)
@@ -624,33 +640,7 @@ export class LazySync {
       }
     }
 
-    // 检查标题冲突
-    if (parsedPanel.title !== structuredData.title) {
-      conflicts.push({
-        region: 'title',
-        field: 'title',
-        reason: panelModTime && structuredModTime
-          ? SyncConflictType.ConcurrentUpdate
-          : SyncConflictType.EtagMismatch,
-        oursTs: structuredModTime,
-        theirsTs: panelModTime,
-      });
-    }
-
-    // 检查 requirements 冲突
-    if (
-      !this.arraysEqual(parsedPanel.requirements, structuredData.requirements || [])
-    ) {
-      conflicts.push({
-        region: 'requirements',
-        field: 'requirements',
-        reason: panelModTime && structuredModTime
-          ? SyncConflictType.ConcurrentUpdate
-          : SyncConflictType.EtagMismatch,
-        oursTs: structuredModTime,
-        theirsTs: panelModTime,
-      });
-    }
+    // 仅对计划文本差异进行冲突标记；标题/需求差异直接作为内容变更处理
 
     return conflicts;
   }
@@ -704,22 +694,26 @@ export class LazySync {
    */
   private resolveByTimestamp(conflict: SyncConflict): ConflictResolution {
     // 时间戳策略的核心问题:
-    // - oursTs 是结构化数据的 updatedAt (可靠)
-    // - theirsTs 是面板文件的 mtime (不太可靠,但是我们目前唯一的选择)
-    //
-    // 策略: 使用时间戳比较,但优先保留结构化数据 (当时间戳相近时)
+    // - oursTs: 结构化数据 updatedAt (相对可靠)
+    // - theirsTs: 面板文件 mtime (不可靠, 可能因回写或编辑器行为被刷新)
+    // 策略:
+    // 1) 如果只有一侧有时间戳 -> 选择有时间戳的一侧为参考, 但默认保留结构化数据
+    // 2) 如果双方都有时间戳 -> 仅当面板时间明显更新(超过阈值)时选择面板, 否则保留结构化数据
+
+    const SKEW_THRESHOLD_MS = 0; // 阈值为 0ms：只要面板时间更新即选择 theirs
 
     if (conflict.oursTs && conflict.theirsTs) {
-      const oursTime = new Date(conflict.oursTs);
-      const theirsTime = new Date(conflict.theirsTs);
+      const oursTime = new Date(conflict.oursTs).getTime();
+      const theirsTime = new Date(conflict.theirsTs).getTime();
 
-      // 比较时间戳
-      return oursTime >= theirsTime
-        ? ConflictResolution.Ours
-        : ConflictResolution.Theirs;
+      // 当面板时间显著更新时才选择 "theirs"
+      if (theirsTime - oursTime > SKEW_THRESHOLD_MS) {
+        return ConflictResolution.Theirs;
+      }
+      return ConflictResolution.Ours;
     }
 
-    // 默认保留结构化数据
+    // 若缺失任一时间戳, 为保守起见默认保留结构化数据
     return ConflictResolution.Ours;
   }
 

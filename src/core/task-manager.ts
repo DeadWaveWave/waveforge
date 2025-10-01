@@ -185,7 +185,7 @@ export class TaskManager {
     this.dataMigrationTool = new DataMigrationTool(this.docsPath);
     this.evrValidator = createEVRValidator();
     this.lazySync = createLazySync();
-    this.panelRenderer = createPanelRenderer();
+    this.panelRenderer = createPanelRenderer({ includeFrontMatter: true });
     this.panelParser = createPanelParser({
       generateMissingAnchors: false, // 禁用自动生成锚点，因为 PanelRenderer 已经生成了正确的锚点
     });
@@ -204,9 +204,6 @@ export class TaskManager {
    */
   getCurrentTaskPanelPath(): string | null {
     try {
-      const fs = require('fs');
-      const path = require('path');
-
       // current-task.md 应该在 .wave 目录下
       const panelPath = path.join(this.docsPath, 'current-task.md');
 
@@ -456,24 +453,30 @@ export class TaskManager {
       // 检测差异
       const diff = this.lazySync.detectDifferences(panelContent, taskData);
 
-      if (!diff.hasChanges || diff.contentChanges.length === 0) {
-        // 检查是否有状态变更
-        if (diff.statusChanges && diff.statusChanges.length > 0) {
-          // 只有状态变更，返回包含状态变更的预览信息
-          return {
-            applied: false,
-            changes: [],
-            statusChanges: diff.statusChanges,
-            conflicts: [],
-            auditEntries: [],
-            mdVersion: '',
-          };
-        }
+      if (!diff.hasChanges) {
         // 没有任何变更，无需同步
         return null;
       }
 
-      // 应用同步变更
+      // 如果只有状态变更，不应用且不回写面板（状态隔离原则）
+      if (diff.contentChanges.length === 0 && diff.statusChanges && diff.statusChanges.length > 0) {
+        // 只有状态变更，返回包含状态变更的预览信息，但不回写
+        return {
+          applied: false,
+          changes: [],
+          statusChanges: diff.statusChanges,
+          conflicts: [],
+          auditEntries: [],
+          mdVersion: '',
+        };
+      }
+
+      // 如果没有内容变更，无需同步
+      if (diff.contentChanges.length === 0) {
+        return null;
+      }
+
+      // 应用同步变更（只应用内容变更）
       const syncResult = await this.lazySync.applySyncChanges(diff, 'etag_first_then_ts');
 
       // 将变更应用到任务数据
@@ -741,14 +744,30 @@ export class TaskManager {
 
       this.validateTaskDataStructure(taskData);
 
-      const task = taskData as CurrentTask;
+      // 在同步前读取原始面板内容（用于后续预览避免回写干扰）
+      const panelPath = this.getCurrentTaskPanelPath();
+      let originalPanelContent: string | undefined;
+      if (panelPath && (await fs.pathExists(panelPath))) {
+        try {
+          originalPanelContent = await fs.readFile(panelPath, 'utf8');
+        } catch {
+          // 忽略读取面板失败
+        }
+      }
 
-      // 执行 Lazy 同步（如果有面板修改）
-      await this.performLazySync(task, effectiveProjectId);
+      // 注意：读取操作保持干净，不在此处执行懒同步（read 为 dry-run）
+      const syncResult: any = null;
 
       // 重新加载任务以获取同步后的最新数据
       const updatedData = await fs.readFile(taskPath, 'utf8');
-      return JSON.parse(updatedData) as CurrentTask;
+      const reloaded = JSON.parse(updatedData) as CurrentTask;
+
+      // 如果同步已应用，携带原始面板内容供后续预览使用（不持久化，只在内存中传递）
+      if (syncResult && syncResult.applied && originalPanelContent) {
+        (reloaded as any)._originalPanelContent = originalPanelContent;
+      }
+
+      return reloaded;
     } catch (error) {
       if (
         error instanceof Error &&
@@ -1739,6 +1758,13 @@ export class TaskManager {
         }
       }
     }
+
+    // 记录调试信息
+    logger.info(LogCategory.Task, LogAction.Handle, 'Active hints resolved', {
+      taskHintsCount: hints.task?.length || 0,
+      planHintsCount: hints.plan?.length || 0,
+      stepHintsCount: hints.step?.length || 0,
+    });
 
     return hints;
   }
