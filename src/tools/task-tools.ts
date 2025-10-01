@@ -629,6 +629,10 @@ export class CurrentTaskModifyTool extends BaseTaskTool {
         step_id: params.step_id,
         change_type: params.change_type,
         project_id: params.project_id,
+        evr: params.evr,
+        op: params.op,
+        hints: params.hints,
+        tags: params.tags,
       });
 
       this.logOperation(

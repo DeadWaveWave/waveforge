@@ -1722,3 +1722,19 @@ export interface LogEntry {
   /** 日志消息 */
   message: string;
 }
+
+/**
+ * EVR 内容修改项接口
+ */
+export interface EVRContentItem {
+  /** EVR ID（用于更新现有 EVR） */
+  evrId?: string;
+  /** EVR 标题 */
+  title?: string;
+  /** 验证方法（字符串或字符串数组） */
+  verify?: string | string[];
+  /** 预期结果（字符串或字符串数组） */
+  expect?: string | string[];
+  /** EVR 类别 */
+  class?: EVRClass;
+}

@@ -477,7 +477,7 @@ describe('CurrentTaskModifyTool', () => {
           properties: {
             field: expect.objectContaining({
               type: 'string',
-              enum: ['goal', 'plan', 'steps', 'hints'],
+              enum: ['goal', 'plan', 'steps', 'hints', 'evr'],
             }),
             change_type: expect.objectContaining({
               type: 'string',
@@ -488,7 +488,7 @@ describe('CurrentTaskModifyTool', () => {
               ]),
             }),
           },
-          required: ['field', 'content', 'reason', 'change_type'],
+          required: ['field', 'reason', 'change_type'],
           additionalProperties: false,
         },
       });

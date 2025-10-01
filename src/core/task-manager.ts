@@ -17,11 +17,16 @@ import {
   LogLevel,
   LogCategory,
   LogAction,
+  EVRStatus,
+  EVRClass,
   type CurrentTask,
   type TaskPlan,
   type TaskStep,
   type TaskLog,
   type SyncPreview,
+  type ExpectedResult,
+  type EVRContentItem,
+  type ContextTag,
 } from '../types/index.js';
 
 /**
@@ -99,8 +104,8 @@ export interface TaskUpdateResult {
  * 任务修改参数接口
  */
 export interface TaskModifyParams {
-  field: 'goal' | 'plan' | 'steps' | 'hints';
-  content: string | string[];
+  field: 'goal' | 'plan' | 'steps' | 'hints' | 'evr';
+  content?: string | string[];
   reason: string;
   plan_id?: string;
   step_id?: string;
@@ -113,6 +118,17 @@ export interface TaskModifyParams {
     | 'user_request'
     | 'scope_change';
   project_id?: string;
+  
+  // EVR 专用参数
+  evr?: {
+    items?: EVRContentItem[];
+    evrIds?: string[];  // for remove/rebind operations
+  };
+  
+  // 通用参数
+  op?: 'replace' | 'append' | 'insert' | 'remove' | 'update';
+  hints?: string[];
+  tags?: ContextTag[];
 }
 
 /**
@@ -130,6 +146,9 @@ export interface TaskModifyResult {
   first_step_started?: boolean;
   hints_added?: number;
   hint_level?: string;
+  // EVR 相关字段
+  evr_modified?: number;
+  operation_type?: string;
 }
 
 /**
@@ -553,6 +572,9 @@ export class TaskManager {
           break;
         case 'hints':
           result = await this.modifyHints(task, params, timestamp);
+          break;
+        case 'evr':
+          result = await this.modifyEVR(task, params, timestamp);
           break;
         default:
           throw new Error(`不支持的修改字段: ${params.field}`);
@@ -1589,12 +1611,21 @@ export class TaskManager {
   }
 
   private validateModifyParams(params: TaskModifyParams): void {
-    if (!['goal', 'plan', 'steps', 'hints'].includes(params.field)) {
+    if (!['goal', 'plan', 'steps', 'hints', 'evr'].includes(params.field)) {
       throw new Error(`不支持的修改字段: ${params.field}`);
     }
 
-    if (params.content === undefined || params.content === null) {
-      throw new Error('修改内容不能为空');
+    // EVR 字段的内容验证特殊处理
+    if (params.field === 'evr') {
+      if (!params.evr || 
+          ((!params.evr.items || params.evr.items.length === 0) && 
+           (!params.evr.evrIds || params.evr.evrIds.length === 0))) {
+        throw new Error('EVR修改时必须提供evr.items或evr.evrIds');
+      }
+    } else {
+      if (params.content === undefined || params.content === null) {
+        throw new Error('修改内容不能为空');
+      }
     }
 
     if (!params.reason || params.reason.trim() === '') {
@@ -1627,8 +1658,17 @@ export class TaskManager {
 
   private validateContentFormat(
     field: string,
-    content: string | string[]
+    content: string | string[] | undefined
   ): void {
+    // EVR 字段有自己的验证逻辑，跳过通用验证
+    if (field === 'evr') {
+      return;
+    }
+
+    if (content === undefined || content === null) {
+      throw new Error(`${field}字段的内容不能为空`);
+    }
+
     switch (field) {
       case 'goal':
         if (typeof content !== 'string') {
@@ -1869,6 +1909,123 @@ export class TaskManager {
       affected_ids: affectedIds,
       hints_added: newHints.length,
       hint_level: targetLevel,
+    };
+  }
+
+  private async modifyEVR(
+    task: CurrentTask,
+    params: TaskModifyParams,
+    timestamp: string
+  ): Promise<TaskModifyResult> {
+    if (!params.evr) {
+      throw new Error('EVR修改参数不能为空');
+    }
+
+    // 确保 expectedResults 数组存在
+    if (!task.expectedResults) {
+      task.expectedResults = [];
+    }
+
+    const affectedIds: string[] = [];
+    let operationCount = 0;
+    let operationType = 'update';
+
+    // 处理 EVR 内容修改
+    if (params.evr.items && params.evr.items.length > 0) {
+      for (const item of params.evr.items) {
+        if (item.evrId) {
+          // 更新现有 EVR
+          const existingEVR = task.expectedResults.find(evr => evr.id === item.evrId);
+          if (!existingEVR) {
+            throw new Error(`EVR ${item.evrId} 不存在`);
+          }
+
+          // 更新 EVR 内容字段，保持数组结构
+          if (item.title !== undefined) {
+            existingEVR.title = item.title;
+          }
+          if (item.verify !== undefined) {
+            existingEVR.verify = item.verify;
+          }
+          if (item.expect !== undefined) {
+            existingEVR.expect = item.expect;
+          }
+          if (item.class !== undefined) {
+            existingEVR.class = item.class;
+          }
+
+          affectedIds.push(item.evrId);
+          operationCount++;
+        } else {
+          // 创建新 EVR
+          const newEVR: ExpectedResult = {
+            id: `evr-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            title: item.title || '新EVR',
+            verify: item.verify || '',
+            expect: item.expect || '',
+            status: EVRStatus.Unknown,
+            class: item.class || EVRClass.Runtime,
+            referencedBy: [],
+            runs: [],
+          };
+
+          task.expectedResults.push(newEVR);
+          affectedIds.push(newEVR.id);
+          operationCount++;
+          operationType = 'create';
+        }
+      }
+    }
+
+    // 处理 EVR 删除或解绑
+    if (params.evr.evrIds && params.evr.evrIds.length > 0) {
+      for (const evrId of params.evr.evrIds) {
+        const evrIndex = task.expectedResults.findIndex(evr => evr.id === evrId);
+        if (evrIndex >= 0) {
+          // 从计划中解绑 EVR
+          task.overall_plan.forEach(plan => {
+            const bindingIndex = plan.evrBindings?.indexOf(evrId);
+            if (bindingIndex !== undefined && bindingIndex >= 0) {
+              plan.evrBindings.splice(bindingIndex, 1);
+            }
+          });
+
+          // 删除 EVR
+          task.expectedResults.splice(evrIndex, 1);
+          affectedIds.push(evrId);
+          operationCount++;
+          operationType = 'remove';
+        }
+      }
+    }
+
+    // 记录操作日志
+    const log: TaskLog = {
+      timestamp,
+      level: LogLevel.Info,
+      category: LogCategory.Task,
+      action: LogAction.Modify,
+      message: `EVR内容修改: ${operationType}`,
+      ai_notes: params.reason,
+      details: {
+        field: 'evr',
+        change_type: params.change_type,
+        reason: params.reason,
+        operation_type: operationType,
+        operation_count: operationCount,
+        affected_evr_ids: affectedIds,
+        evr_items: params.evr.items?.length || 0,
+        evr_ids: params.evr.evrIds?.length || 0,
+      },
+    };
+    task.logs.push(log);
+
+    return {
+      success: true,
+      field: 'evr',
+      affected_ids: affectedIds,
+      evr_modified: operationCount,
+      operation_type: operationType,
     };
   }
 

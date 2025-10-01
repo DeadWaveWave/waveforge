@@ -351,20 +351,20 @@ export const CurrentTaskReadSchema = {
  */
 export const CurrentTaskModifySchema = {
   name: 'current_task_modify',
-  description: '动态修改任务结构，包括计划、步骤和目标，支持提示管理',
+  description: '动态修改任务结构，包括计划、步骤、目标和EVR内容，支持提示管理',
   inputSchema: {
     type: 'object' as const,
     properties: {
       field: {
         type: 'string' as const,
-        enum: ['goal', 'plan', 'steps', 'hints'],
+        enum: ['goal', 'plan', 'steps', 'hints', 'evr'],
         description:
-          '修改字段：goal=验收标准，plan=整体计划，steps=计划步骤，hints=用户提示',
+          '修改字段：goal=验收标准，plan=整体计划，steps=计划步骤，hints=用户提示，evr=EVR内容',
       },
       content: {
         // 移除 oneOf 以兼容 Cursor/Kiro
         // 可以是 string 或 string[]，在代码中验证
-        description: '修改内容（字符串或字符串数组）',
+        description: '修改内容（字符串或字符串数组，EVR字段时可选）',
       },
       reason: {
         type: 'string' as const,
@@ -397,8 +397,89 @@ export const CurrentTaskModifySchema = {
         type: 'string' as const,
         description: '项目ID（可选，覆盖默认绑定）',
       },
+      // EVR 专用参数
+      evr: {
+        type: 'object' as const,
+        description: 'EVR修改专用参数',
+        properties: {
+          items: {
+            type: 'array' as const,
+            description: 'EVR内容修改项列表',
+            items: {
+              type: 'object' as const,
+              properties: {
+                evrId: {
+                  type: 'string' as const,
+                  description: 'EVR ID（用于更新现有EVR）',
+                },
+                title: {
+                  type: 'string' as const,
+                  description: 'EVR标题',
+                },
+                verify: {
+                  description: '验证方法（字符串或字符串数组）',
+                },
+                expect: {
+                  description: '预期结果（字符串或字符串数组）',
+                },
+                class: {
+                  type: 'string' as const,
+                  enum: ['runtime', 'static'],
+                  description: 'EVR类别',
+                },
+              },
+              additionalProperties: false,
+            },
+          },
+          evrIds: {
+            type: 'array' as const,
+            description: 'EVR ID列表（用于删除或重新绑定操作）',
+            items: {
+              type: 'string' as const,
+            },
+          },
+        },
+        additionalProperties: false,
+      },
+      // 通用参数
+      op: {
+        type: 'string' as const,
+        enum: ['replace', 'append', 'insert', 'remove', 'update'],
+        description: '操作类型',
+      },
+      hints: {
+        type: 'array' as const,
+        description: '提示列表',
+        items: {
+          type: 'string' as const,
+        },
+      },
+      tags: {
+        type: 'array' as const,
+        description: '上下文标签列表',
+        items: {
+          type: 'object' as const,
+          properties: {
+            tag: {
+              type: 'string' as const,
+              description: '标签类型',
+            },
+            value: {
+              type: 'string' as const,
+              description: '标签值',
+            },
+            type: {
+              type: 'string' as const,
+              enum: ['ref', 'decision', 'discuss', 'inputs', 'constraints', 'evr', 'uses_evr'],
+              description: '标签类型分类',
+            },
+          },
+          required: ['tag', 'value', 'type'],
+          additionalProperties: false,
+        },
+      },
     },
-    required: ['field', 'content', 'reason', 'change_type'],
+    required: ['field', 'reason', 'change_type'],
     additionalProperties: false,
   },
 };
