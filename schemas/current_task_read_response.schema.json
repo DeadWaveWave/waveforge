@@ -64,7 +64,12 @@
               },
               "status": {
                 "type": "string",
-                "enum": ["to_do", "in_progress", "completed", "blocked"],
+                "enum": [
+                  "to_do",
+                  "in_progress",
+                  "completed",
+                  "blocked"
+                ],
                 "description": "Plan status"
               },
               "steps": {
@@ -82,7 +87,12 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": ["to_do", "in_progress", "completed", "blocked"]
+                      "enum": [
+                        "to_do",
+                        "in_progress",
+                        "completed",
+                        "blocked"
+                      ]
                     },
                     "hints": {
                       "type": "array",
@@ -139,7 +149,10 @@
                 "format": "date-time"
               },
               "completed_at": {
-                "type": ["string", "null"],
+                "type": [
+                  "string",
+                  "null"
+                ],
                 "format": "date-time"
               }
             },
@@ -155,7 +168,10 @@
           }
         },
         "current_plan_id": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "pattern": "^plan-\\d+$",
           "description": "Currently active plan ID"
         },
@@ -181,7 +197,11 @@
         },
         "status": {
           "type": "string",
-          "enum": ["active", "completed", "archived"],
+          "enum": [
+            "active",
+            "completed",
+            "archived"
+          ],
           "description": "Task status"
         },
         "created_at": {
@@ -319,23 +339,40 @@
         },
         "status": {
           "type": "string",
-          "enum": ["pass", "fail", "skip", "unknown"]
+          "enum": [
+            "pass",
+            "fail",
+            "skip",
+            "unknown"
+          ]
         },
         "class": {
           "type": "string",
-          "enum": ["runtime", "static"],
+          "enum": [
+            "runtime",
+            "static"
+          ],
           "default": "runtime"
         },
         "last_run": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "date-time"
         },
         "notes": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "maxLength": 2000
         },
         "proof": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "maxLength": 500
         },
         "referenced_by": {
@@ -371,22 +408,41 @@
         },
         "by": {
           "type": "string",
-          "enum": ["ai", "user", "ci"]
+          "enum": [
+            "ai",
+            "user",
+            "ci"
+          ]
         },
         "status": {
           "type": "string",
-          "enum": ["pass", "fail", "skip", "unknown"]
+          "enum": [
+            "pass",
+            "fail",
+            "skip",
+            "unknown"
+          ]
         },
         "notes": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "maxLength": 2000
         },
         "proof": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "maxLength": 500
         }
       },
-      "required": ["at", "by", "status"]
+      "required": [
+        "at",
+        "by",
+        "status"
+      ]
     },
     "context_tag": {
       "type": "object",
@@ -412,7 +468,11 @@
           ]
         }
       },
-      "required": ["tag", "value", "type"]
+      "required": [
+        "tag",
+        "value",
+        "type"
+      ]
     },
     "evr_summary": {
       "type": "object",
@@ -479,10 +539,18 @@
         },
         "status": {
           "type": "string",
-          "enum": ["pass", "fail", "skip", "unknown"]
+          "enum": [
+            "pass",
+            "fail",
+            "skip",
+            "unknown"
+          ]
         },
         "last_run": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "date-time"
         },
         "referenced_by": {
@@ -499,7 +567,13 @@
           }
         }
       },
-      "required": ["evr_id", "title", "status", "referenced_by", "runs"]
+      "required": [
+        "evr_id",
+        "title",
+        "status",
+        "referenced_by",
+        "runs"
+      ]
     },
     "sync_preview": {
       "type": "object",
@@ -526,14 +600,22 @@
           }
         }
       },
-      "required": ["applied", "changes", "conflicts", "affected_sections"]
+      "required": [
+        "applied",
+        "changes",
+        "conflicts",
+        "affected_sections"
+      ]
     },
     "sync_change": {
       "type": "object",
       "properties": {
         "type": {
           "type": "string",
-          "enum": ["content", "structure"]
+          "enum": [
+            "content",
+            "structure"
+          ]
         },
         "section": {
           "type": "string"
@@ -545,7 +627,10 @@
         "new_value": {},
         "source": {
           "type": "string",
-          "enum": ["panel", "structured"]
+          "enum": [
+            "panel",
+            "structured"
+          ]
         }
       },
       "required": [
@@ -568,18 +653,32 @@
         },
         "reason": {
           "type": "string",
-          "enum": ["etag_mismatch", "concurrent_update", "parse_error"]
+          "enum": [
+            "etag_mismatch",
+            "concurrent_update",
+            "parse_error"
+          ]
         },
         "ours_ts": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "date-time"
         },
         "theirs_ts": {
-          "type": ["string", "null"],
+          "type": [
+            "string",
+            "null"
+          ],
           "format": "date-time"
         }
       },
-      "required": ["region", "field", "reason"]
+      "required": [
+        "region",
+        "field",
+        "reason"
+      ]
     },
     "log_entry": {
       "type": "object",
@@ -590,22 +689,50 @@
         },
         "level": {
           "type": "string",
-          "enum": ["INFO", "WARN", "ERROR"]
+          "enum": [
+            "INFO",
+            "WARN",
+            "ERROR"
+          ]
         },
         "category": {
           "type": "string",
-          "enum": ["TEST", "TASK", "EXCEPTION", "DISCUSSION", "PLAN", "SYSTEM"]
+          "enum": [
+            "TEST",
+            "TASK",
+            "EXCEPTION",
+            "DISCUSSION",
+            "PLAN",
+            "SYSTEM"
+          ]
         },
         "action": {
           "type": "string",
-          "enum": ["UPDATE", "CREATE", "MODIFY", "SWITCH", "HANDLE"]
+          "enum": [
+            "UPDATE",
+            "CREATE",
+            "MODIFY",
+            "SWITCH",
+            "HANDLE",
+            "VERIFIED",
+            "FAILED",
+            "PANEL_EDIT",
+            "DECISION",
+            "IMPACT"
+          ]
         },
         "message": {
           "type": "string",
           "minLength": 1
         }
       },
-      "required": ["ts", "level", "category", "action", "message"]
+      "required": [
+        "ts",
+        "level",
+        "category",
+        "action",
+        "message"
+      ]
     },
     "section_fingerprints": {
       "type": "object",

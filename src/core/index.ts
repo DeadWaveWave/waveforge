@@ -38,3 +38,8 @@ export {
   createFakeTaskStore,
   type FakeTaskStoreOptions,
 } from './fake-task-store.js';
+export {
+  LogHighlightSelector,
+  type HighlightedLog,
+  type LogHighlightConfig,
+} from './log-highlights.js';

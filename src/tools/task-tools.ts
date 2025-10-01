@@ -24,6 +24,7 @@ import {
   createEVRValidator,
   LazySync,
   createLazySync,
+  LogHighlightSelector,
 } from '../core/index.js';
 import {
   TaskStatus,
@@ -505,42 +506,20 @@ export class CurrentTaskReadTool extends BaseTaskTool {
   }
 
   /**
-   * 选择高亮日志
+   * 选择高亮日志（使用新的 LogHighlightSelector）
    */
   private selectHighlightLogs(logs: any[]): LogEntry[] {
-    const highlights: LogEntry[] = [];
-    const maxHighlights = 20; // 最多20条高亮
+    const selector = new LogHighlightSelector({ maxHighlights: 20 });
+    const highlights = selector.selectHighlights(logs);
 
-    // 优先级：EXCEPTION > TEST > TASK/MODIFY > DISCUSSION
-    const priorityOrder = ['EXCEPTION', 'TEST', 'TASK', 'MODIFY', 'DISCUSSION'];
-
-    // 按优先级和时间排序
-    const sortedLogs = logs
-      .filter((log) => log.category && priorityOrder.includes(log.category))
-      .sort((a, b) => {
-        const aPriority = priorityOrder.indexOf(a.category);
-        const bPriority = priorityOrder.indexOf(b.category);
-        if (aPriority !== bPriority) {
-          return aPriority - bPriority; // 优先级高的在前
-        }
-        return (
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-        ); // 时间新的在前
-      });
-
-    // 选择前 N 条作为高亮
-    for (let i = 0; i < Math.min(sortedLogs.length, maxHighlights); i++) {
-      const log = sortedLogs[i];
-      highlights.push({
-        ts: log.timestamp,
-        level: log.level || 'INFO',
-        category: log.category,
-        action: log.action,
-        message: log.message,
-      });
-    }
-
-    return highlights;
+    // 转换为 LogEntry 格式
+    return highlights.map((h) => ({
+      ts: h.ts,
+      level: h.level,
+      category: h.category,
+      action: h.action,
+      message: h.message,
+    }));
   }
 
   /**

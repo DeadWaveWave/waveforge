@@ -49,6 +49,12 @@ export enum LogAction {
   Modify = 'MODIFY',
   Switch = 'SWITCH',
   Handle = 'HANDLE',
+  // 高亮标记
+  Verified = 'VERIFIED',
+  Failed = 'FAILED',
+  PanelEdit = 'PANEL_EDIT',
+  Decision = 'DECISION',
+  Impact = 'IMPACT',
 }
 
 /**
@@ -318,11 +324,11 @@ export interface TaskState {
 export interface ConflictInfo {
   /** 冲突类型 */
   type:
-    | 'concurrent_update'
-    | 'state_mismatch'
-    | 'hint_collision'
-    | 'version_conflict'
-    | 'lock_timeout';
+  | 'concurrent_update'
+  | 'state_mismatch'
+  | 'hint_collision'
+  | 'version_conflict'
+  | 'lock_timeout';
   /** 冲突的操作列表 */
   operations: TaskOperation[];
   /** 解决方案 */
@@ -460,12 +466,12 @@ export interface ProjectTypeDetectionResult {
 export interface ProjectFeature {
   /** 特征类型 */
   type:
-    | 'config_file'
-    | 'dependency_file'
-    | 'source_file'
-    | 'build_file'
-    | 'git_repo'
-    | 'directory_structure';
+  | 'config_file'
+  | 'dependency_file'
+  | 'source_file'
+  | 'build_file'
+  | 'git_repo'
+  | 'directory_structure';
   /** 特征名称 */
   name: string;
   /** 特征文件路径 */
@@ -1128,13 +1134,13 @@ export interface ContextTag {
   value: string;
   /** 标签类型分类 */
   type:
-    | 'ref'
-    | 'decision'
-    | 'discuss'
-    | 'inputs'
-    | 'constraints'
-    | 'evr'
-    | 'uses_evr';
+  | 'ref'
+  | 'decision'
+  | 'discuss'
+  | 'inputs'
+  | 'constraints'
+  | 'evr'
+  | 'uses_evr';
 }
 
 /**
@@ -1448,10 +1454,10 @@ export interface PanelMetadata {
 export interface PanelParseError {
   /** 错误类型 */
   type:
-    | 'missing_anchor'
-    | 'invalid_checkbox'
-    | 'malformed_section'
-    | 'duplicate_id';
+  | 'missing_anchor'
+  | 'invalid_checkbox'
+  | 'malformed_section'
+  | 'duplicate_id';
   /** 错误消息 */
   message: string;
   /** 错误位置（行号） */
@@ -1468,10 +1474,10 @@ export interface PanelParseError {
 export interface ToleranceFix {
   /** 修复类型 */
   type:
-    | 'normalize_checkbox'
-    | 'generate_anchor'
-    | 'fix_indentation'
-    | 'add_missing_line';
+  | 'normalize_checkbox'
+  | 'generate_anchor'
+  | 'fix_indentation'
+  | 'add_missing_line';
   /** 修复描述 */
   description: string;
   /** 修复位置（行号） */
