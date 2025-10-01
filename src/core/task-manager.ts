@@ -110,21 +110,21 @@ export interface TaskModifyParams {
   plan_id?: string;
   step_id?: string;
   change_type:
-    | 'generate_steps'
-    | 'plan_adjustment'
-    | 'steps_adjustment'
-    | 'refine_goal'
-    | 'bug_fix_replan'
-    | 'user_request'
-    | 'scope_change';
+  | 'generate_steps'
+  | 'plan_adjustment'
+  | 'steps_adjustment'
+  | 'refine_goal'
+  | 'bug_fix_replan'
+  | 'user_request'
+  | 'scope_change';
   project_id?: string;
-  
+
   // EVR 专用参数
   evr?: {
     items?: EVRContentItem[];
     evrIds?: string[];  // for remove/rebind operations
   };
-  
+
   // 通用参数
   op?: 'replace' | 'append' | 'insert' | 'remove' | 'update';
   hints?: string[];
@@ -642,11 +642,32 @@ export class TaskManager {
   async completeTask(
     summary: string,
     projectId?: string
-  ): Promise<{ archived_task_id: string }> {
+  ): Promise<{
+    archived_task_id: string;
+    evr_summary?: any;
+    evr_required_final?: Array<{
+      evr_id: string;
+      reason: 'need_reason_for_skip' | 'status_unknown' | 'failed';
+    }>;
+    evr_ready?: boolean;
+  }> {
     try {
       const task = await this.getCurrentTask(projectId);
       if (!task) {
         throw new Error('当前没有活跃的任务');
+      }
+
+      // 检查 EVR 就绪性
+      const evrValidator = createEVRValidator();
+      const evrs = task.expectedResults || [];
+      const evrValidation = evrValidator.validateEVRReadiness(evrs);
+
+      // 如果 EVR 未就绪，抛出错误并附带详细信息
+      if (!evrValidation.ready) {
+        const error: any = new Error('EVR 验证未就绪，无法完成任务');
+        error.code = 'EVR_NOT_READY';
+        error.evrValidation = evrValidation;
+        throw error;
       }
 
       const timestamp = new Date().toISOString();
@@ -668,6 +689,22 @@ export class TaskManager {
       };
       task.logs.push(completeLog);
 
+      // 添加 EVR 验证成功日志
+      if (evrs.length > 0) {
+        const evrLog: TaskLog = {
+          timestamp,
+          level: LogLevel.Info,
+          category: LogCategory.Test,
+          action: LogAction.Handle,
+          message: 'EVR 验证成功',
+          ai_notes: `所有 EVR 已就绪: ${evrValidation.summary.passed.length} passed, ${evrValidation.summary.skipped.length} skipped`,
+          details: {
+            evr_summary: evrValidation.summary,
+          },
+        };
+        task.logs.push(evrLog);
+      }
+
       // 保存最终状态
       await this.saveTask(task, projectId);
 
@@ -686,10 +723,13 @@ export class TaskManager {
         taskId: task.id,
         title: task.title,
         summary,
+        evrSummary: evrValidation.summary,
       });
 
       return {
         archived_task_id: task.id,
+        evr_summary: evrValidation.summary,
+        evr_ready: true,
       };
     } catch (error) {
       logger.error(LogCategory.Task, LogAction.Update, '任务完成失败', {
@@ -1138,7 +1178,7 @@ export class TaskManager {
     // 计划级门槛检查：尝试完成计划时检查 EVR 就绪性
     if (params.status === TaskStatus.Completed && plan.evrBindings?.length > 0) {
       const allEVRs = task.expectedResults || [];
-      
+
       const gateResult = this.evrValidator.checkPlanGate(plan.id, allEVRs);
       if (!gateResult.canComplete) {
         // 阻止计划完成，返回 evr_pending
@@ -1617,9 +1657,9 @@ export class TaskManager {
 
     // EVR 字段的内容验证特殊处理
     if (params.field === 'evr') {
-      if (!params.evr || 
-          ((!params.evr.items || params.evr.items.length === 0) && 
-           (!params.evr.evrIds || params.evr.evrIds.length === 0))) {
+      if (!params.evr ||
+        ((!params.evr.items || params.evr.items.length === 0) &&
+          (!params.evr.evrIds || params.evr.evrIds.length === 0))) {
         throw new Error('EVR修改时必须提供evr.items或evr.evrIds');
       }
     } else {

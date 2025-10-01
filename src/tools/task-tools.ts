@@ -713,6 +713,23 @@ export class CurrentTaskCompleteTool extends BaseTaskTool {
         index_updated: true,
       };
 
+      // 添加 EVR 摘要
+      if (result.evr_summary) {
+        responseData.evr_summary = result.evr_summary;
+      }
+
+      // 添加日志高亮
+      if (result.evr_summary && result.evr_summary.total > 0) {
+        responseData.logs_highlights = [
+          {
+            ts: new Date().toISOString(),
+            level: 'INFO',
+            category: 'TEST',
+            message: `EVR 验证成功: ${result.evr_summary.passed.length} passed, ${result.evr_summary.skipped.length} skipped`,
+          },
+        ];
+      }
+
       // 根据 generate_docs 参数决定是否返回 devlog 建议
       if (params.generate_docs !== false) {
         responseData.devlog_recommendation = {
@@ -725,7 +742,48 @@ export class CurrentTaskCompleteTool extends BaseTaskTool {
       }
 
       return this.createSuccessResponse(responseData);
-    } catch (error) {
+    } catch (error: any) {
+      // 检查是否是 EVR 验证失败
+      if (error.code === 'EVR_NOT_READY' && error.evrValidation) {
+        this.logOperation(
+          LogCategory.Test,
+          LogAction.Handle,
+          'EVR 验证未就绪',
+          {
+            evrSummary: error.evrValidation.summary,
+            requiredFinal: error.evrValidation.requiredFinal,
+          }
+        );
+
+        // 直接构建错误响应，包含 EVR 相关字段
+        const errorResponse = {
+          success: false,
+          error: 'EVR 验证未就绪，无法完成任务',
+          error_code: 'EVR_NOT_READY',
+          type: 'EVR_ERROR',
+          timestamp: new Date().toISOString(),
+          evr_required_final: error.evrValidation.requiredFinal,
+          evr_summary: error.evrValidation.summary,
+          logs_highlights: [
+            {
+              ts: new Date().toISOString(),
+              level: 'ERROR',
+              category: 'TEST',
+              message: `EVR 验证失败: ${error.evrValidation.requiredFinal.length} 项未就绪`,
+            },
+          ],
+        };
+
+        return {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(errorResponse, null, 2),
+            },
+          ],
+        };
+      }
+
       this.logOperation(
         LogCategory.Exception,
         LogAction.Handle,
