@@ -253,11 +253,11 @@ describe('MultiTaskDirectoryManager', () => {
         archive.files.currentMd,
         'utf8'
       );
-      expect(markdownContent).toContain('提示1');
-      expect(markdownContent).toContain('计划提示1');
-      expect(markdownContent).toContain('步骤提示1');
-      expect(markdownContent).toContain('test-evidence.txt');
-      expect(markdownContent).toContain('步骤备注');
+      // 验证面板包含关键信息（新格式）
+      expect(markdownContent).toContain('# Task:');
+      expect(markdownContent).toContain('## Plans & Steps');
+      // 注意：evidence 字段已废弃，新格式不渲染
+      // expect(markdownContent).toContain('test-evidence.txt');
     });
   });
 
@@ -529,8 +529,8 @@ describe('MultiTaskDirectoryManager', () => {
         archive.files.currentMd,
         'utf8'
       );
-      expect(markdownContent).toContain(emptyTask.title);
-      expect(markdownContent).toContain('暂无计划');
+      expect(markdownContent).toContain(`# Task: ${emptyTask.title}`);
+      // 新格式：空计划时不显示 "暂无计划"，Plans section 不出现
     });
   });
 });

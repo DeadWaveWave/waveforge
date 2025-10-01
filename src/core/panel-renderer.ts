@@ -57,15 +57,26 @@ export class PanelRenderer {
   renderToMarkdown(data: ParsedPanel): string {
     const sections: string[] = [];
 
-    // 渲染标题
+    // 渲染标题（设计文档格式：# Task: xxx）
     if (data.title) {
-      sections.push(`# ${data.title}`);
+      sections.push(`# Task: ${data.title}`);
+      sections.push('');
+    }
+
+    // 渲染元数据
+    if (data.taskId) {
+      sections.push(`Task ID: ${data.taskId}`);
+    }
+    if (data.references && data.references.length > 0) {
+      sections.push(`References: ${data.references.join(', ')}`);
+    }
+    if (data.taskId || (data.references && data.references.length > 0)) {
       sections.push('');
     }
 
     // 渲染需求
     if (data.requirements.length > 0) {
-      sections.push('## 需求');
+      sections.push('## Requirements');
       sections.push('');
       data.requirements.forEach((req) => {
         sections.push(`- ${req}`);
@@ -75,7 +86,7 @@ export class PanelRenderer {
 
     // 渲染问题
     if (data.issues.length > 0) {
-      sections.push('## 问题');
+      sections.push('## Issues');
       sections.push('');
       data.issues.forEach((issue) => {
         sections.push(`- ${issue}`);
@@ -85,7 +96,7 @@ export class PanelRenderer {
 
     // 渲染提示
     if (data.hints.length > 0) {
-      sections.push('## 提示');
+      sections.push('## Task Hints');
       sections.push('');
       data.hints.forEach((hint) => {
         sections.push(this.formatQuoteBlock(hint));
@@ -93,25 +104,25 @@ export class PanelRenderer {
       sections.push('');
     }
 
-    // 渲染计划
-    if (data.plans.length > 0) {
-      sections.push('## 整体计划');
-      sections.push('');
-      sections.push(this.renderPlans(data.plans));
-      sections.push('');
-    }
-
     // 渲染 EVR
     if (data.evrs.length > 0) {
-      sections.push('## 预期结果 (EVR)');
+      sections.push('## Expected Visible Results');
       sections.push('');
       sections.push(this.renderEVRs(data.evrs));
       sections.push('');
     }
 
+    // 渲染计划
+    if (data.plans.length > 0) {
+      sections.push('## Plans & Steps');
+      sections.push('');
+      sections.push(this.renderPlans(data.plans));
+      sections.push('');
+    }
+
     // 渲染日志
     if (data.logs.length > 0) {
-      sections.push('## 日志');
+      sections.push('## Logs');
       sections.push('');
       sections.push(this.renderLogs(data.logs));
     }
@@ -272,7 +283,7 @@ export class PanelRenderer {
       lines.push('');
 
       // 渲染验证运行记录
-      if (evr.runs.length > 0) {
+      if (evr.runs && evr.runs.length > 0) {
         lines.push('**Verification Runs:**');
         evr.runs.forEach((run) => {
           lines.push(`- ${run.at} by ${run.by}: ${run.status}`);

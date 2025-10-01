@@ -11,6 +11,10 @@ import {
   NotFoundError,
 } from '../core/error-handler.js';
 import {
+  convertResponseToSnakeCase,
+  convertRequestToCamelCase as _convertRequestToCamelCase, // 预留用于请求参数转换
+} from '../core/field-converter.js';
+import {
   CurrentTaskInitSchema,
   CurrentTaskUpdateSchema,
   CurrentTaskReadSchema,
@@ -61,37 +65,39 @@ abstract class BaseTaskTool {
   }
 
   /**
-   * 创建成功响应
+   * 创建成功响应（自动转换为 snake_case）
    */
   protected createSuccessResponse(data: any): any {
+    // 转换字段名为 snake_case
+    const snakeCaseData = convertResponseToSnakeCase({
+      success: true,
+      timestamp: new Date().toISOString(),
+      ...data,
+    });
+
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              timestamp: new Date().toISOString(),
-              ...data,
-            },
-            null,
-            2
-          ),
+          text: JSON.stringify(snakeCaseData, null, 2),
         },
       ],
     };
   }
 
   /**
-   * 创建错误响应
+   * 创建错误响应（自动转换为 snake_case）
    */
   protected createErrorResponse(error: any, context?: any): any {
     const errorResponse = errorHandler.handleError(error, context);
+    // 转换字段名为 snake_case
+    const snakeCaseError = convertResponseToSnakeCase(errorResponse);
+
     return {
       content: [
         {
           type: 'text',
-          text: JSON.stringify(errorResponse, null, 2),
+          text: JSON.stringify(snakeCaseError, null, 2),
         },
       ],
     };

@@ -474,23 +474,23 @@ describe('PanelRenderer', () => {
 
       const result = renderer.renderToMarkdown(panel);
 
-      // 验证各个部分都存在
-      expect(result).toContain('# 测试任务');
-      expect(result).toContain('## 需求');
+      // 验证各个部分都存在（新格式）
+      expect(result).toContain('# Task: 测试任务');
+      expect(result).toContain('## Requirements');
       expect(result).toContain('- 需求1');
       expect(result).toContain('- 需求2');
-      expect(result).toContain('## 问题');
+      expect(result).toContain('## Issues');
       expect(result).toContain('- 问题1');
-      expect(result).toContain('## 提示');
+      expect(result).toContain('## Task Hints');
       expect(result).toContain('> 任务提示');
-      expect(result).toContain('## 整体计划');
+      expect(result).toContain('## Plans & Steps');
       expect(result).toContain('1. [-] 实现功能');
       expect(result).toContain('  > 计划提示');
       expect(result).toContain('  - [ref] docs/api.md');
       expect(result).toContain('  1.1 [x] 创建接口');
-      expect(result).toContain('## 预期结果 (EVR)');
+      expect(result).toContain('## Expected Visible Results');
       expect(result).toContain('### 功能验证');
-      expect(result).toContain('## 日志');
+      expect(result).toContain('## Logs');
       expect(result).toContain(
         '[2023-12-01T10:00:00.000Z] INFO TASK/CREATE: 任务创建'
       );

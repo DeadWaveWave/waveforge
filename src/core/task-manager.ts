@@ -12,6 +12,8 @@ import { MultiTaskDirectoryManager } from './multi-task-directory-manager.js';
 import { DataMigrationTool } from './data-migration-tool.js';
 import { EVRValidator, createEVRValidator } from './evr-validator.js';
 import { LazySync, createLazySync } from './lazy-sync.js';
+import { PanelRenderer, createPanelRenderer } from './panel-renderer.js';
+import { PanelParser, createPanelParser } from './panel-parser.js';
 import {
   TaskStatus,
   LogLevel,
@@ -162,6 +164,8 @@ export class TaskManager {
   private dataMigrationTool: DataMigrationTool;
   private evrValidator: EVRValidator;
   private lazySync: LazySync;
+  private panelRenderer: PanelRenderer;
+  private panelParser: PanelParser;
   private migrationChecked: boolean = false;
 
   constructor(
@@ -181,6 +185,8 @@ export class TaskManager {
     this.dataMigrationTool = new DataMigrationTool(this.docsPath);
     this.evrValidator = createEVRValidator();
     this.lazySync = createLazySync();
+    this.panelRenderer = createPanelRenderer();
+    this.panelParser = createPanelParser();
   }
 
   getDocsPath(): string {
@@ -991,129 +997,93 @@ export class TaskManager {
   }
 
   /**
-   * 生成任务的 Markdown 内容
+   * 生成任务的 Markdown 内容（使用 PanelRenderer）
    */
   private generateTaskMarkdownContent(task: CurrentTask): string {
-    const lines = [
-      `# ${task.title}`,
-      '',
-      `> **任务ID**: ${task.id}`,
-      `> **创建时间**: ${new Date(task.created_at).toLocaleString()}`,
-      `> **更新时间**: ${new Date(task.updated_at).toLocaleString()}`,
-      task.completed_at
-        ? `> **完成时间**: ${new Date(task.completed_at).toLocaleString()}`
-        : '',
-      '',
-      '## 验收标准',
-      '',
-      task.goal,
-      '',
-    ];
+    try {
+      // 将 CurrentTask 转换为 ParsedPanel 格式
+      const panelData = this.convertTaskToPanelData(task);
 
-    // 添加任务级提示
-    if (task.task_hints && task.task_hints.length > 0) {
-      lines.push('## 任务提示');
-      lines.push('');
-      task.task_hints.forEach((hint) => {
-        lines.push(`- ${hint}`);
+      // 调试日志
+      logger.info(LogCategory.Task, LogAction.Create, '准备渲染面板', {
+        hasEVRs: panelData.evrs?.length || 0,
+        hasPlans: panelData.plans?.length || 0,
+        hasLogs: panelData.logs?.length || 0,
       });
-      lines.push('');
-    }
 
-    // 添加整体计划
-    lines.push('## 整体计划');
-    lines.push('');
+      // 使用 PanelRenderer 渲染
+      const result = this.panelRenderer.renderToMarkdown(panelData);
 
-    if (task.overall_plan && task.overall_plan.length > 0) {
-      task.overall_plan.forEach((plan, index) => {
-        const status = this.getStatusIcon(plan.status);
-        const isCurrentPlan = plan.id === task.current_plan_id;
-        const planTitle = isCurrentPlan
-          ? `**${plan.description}** (当前)`
-          : plan.description;
-
-        lines.push(`${index + 1}. ${status} ${planTitle}`);
-
-        // 添加计划级提示
-        if (plan.hints && plan.hints.length > 0) {
-          lines.push('   > 提示:');
-          plan.hints.forEach((hint) => {
-            lines.push(`   > - ${hint}`);
-          });
-        }
-
-        // 添加步骤
-        if (plan.steps && plan.steps.length > 0) {
-          plan.steps.forEach((step) => {
-            const stepStatus = this.getStatusIcon(step.status);
-            lines.push(`   - ${stepStatus} ${step.description}`);
-
-            // 添加步骤级提示
-            if (step.hints && step.hints.length > 0) {
-              lines.push('     > 提示:');
-              step.hints.forEach((hint) => {
-                lines.push(`     > - ${hint}`);
-              });
-            }
-
-            // 添加证据和备注
-            if (step.evidence) {
-              lines.push(`     > 证据: ${step.evidence}`);
-            }
-            if (step.notes) {
-              lines.push(`     > 备注: ${step.notes}`);
-            }
-          });
-        }
-        lines.push('');
+      logger.info(LogCategory.Task, LogAction.Create, '面板渲染成功', {
+        contentLength: result.length,
       });
-    } else {
-      lines.push('暂无计划');
-      lines.push('');
-    }
 
-    // 添加关键日志（最近5条）
-    if (task.logs && task.logs.length > 0) {
-      lines.push('## 关键日志');
-      lines.push('');
-      const recentLogs = task.logs.slice(-5);
-      recentLogs.forEach((log) => {
-        const timestamp = new Date(log.timestamp).toLocaleString();
-        lines.push(`- **${timestamp}** [${log.level}] ${log.message}`);
-        if (log.ai_notes) {
-          lines.push(`  > ${log.ai_notes}`);
-        }
+      return result;
+    } catch (error) {
+      logger.error(LogCategory.Task, LogAction.Create, '面板渲染失败', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
       });
-      lines.push('');
+      throw error;
     }
-
-    lines.push('---');
-    lines.push('');
-    lines.push('*由 WaveForge MCP 任务管理系统自动生成*');
-    lines.push('');
-    lines.push('> ⚠️ **注意**: 此文件由系统自动生成和维护。');
-    lines.push('> 如需修改任务内容，请使用 MCP 工具或直接编辑此文件。');
-    lines.push('> 系统会自动检测文件变更并同步到任务数据中。');
-
-    return lines.filter((line) => line !== null).join('\n');
   }
 
   /**
-   * 获取状态图标
+   * 将 CurrentTask 转换为 ParsedPanel 格式
    */
-  private getStatusIcon(status: string): string {
-    switch (status) {
-      case 'completed':
-        return '✅';
-      case 'in_progress':
-        return '🔄';
-      case 'blocked':
-        return '🚫';
-      case 'to_do':
-      default:
-        return '⏳';
-    }
+  private convertTaskToPanelData(task: CurrentTask): any {
+    return {
+      title: task.title,
+      taskId: task.id,
+      references: task.knowledge_refs || [],
+      requirements: [task.goal], // goal 作为 requirements
+      issues: [],
+      hints: task.task_hints || [],
+      plans: (task.overall_plan || []).map(plan => ({
+        id: plan.id,
+        text: plan.description,
+        status: plan.status,
+        hints: plan.hints || [],
+        contextTags: plan.contextTags || [],
+        evrBindings: plan.evrBindings || [],
+        steps: (plan.steps || []).map(step => ({
+          id: step.id,
+          text: step.description,
+          status: step.status,
+          hints: step.hints || [],
+          contextTags: step.contextTags || [],
+          usesEVR: [],
+        })),
+      })),
+      evrs: (task.expectedResults || []).map(evr => ({
+        id: evr.id,
+        title: evr.title,
+        verify: evr.verify,
+        expect: evr.expect,
+        status: evr.status,
+        class: evr.class,
+        lastRun: evr.lastRun,
+        notes: evr.notes,
+        proof: evr.proof,
+        referencedBy: evr.referencedBy || [],
+      })),
+      logs: (task.logs || []).map(log => ({
+        timestamp: log.timestamp,
+        level: log.level,
+        category: log.category,
+        action: log.action,
+        message: log.message,
+        aiNotes: log.ai_notes,
+      })),
+      metadata: {
+        createdAt: task.created_at,
+        updatedAt: task.updated_at,
+        completedAt: task.completed_at,
+        currentPlanId: task.current_plan_id,
+      },
+    };
   }
+
 
   private validateUpdateParams(params: TaskUpdateParams): void {
     if (!['plan', 'step', 'evr'].includes(params.update_type)) {

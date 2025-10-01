@@ -7,6 +7,7 @@
 import fs from 'fs-extra';
 import * as path from 'path';
 import { logger } from './logger.js';
+import { PanelRenderer, createPanelRenderer } from './panel-renderer.js';
 import {
   LogCategory,
   LogAction,
@@ -21,6 +22,7 @@ import {
 export class MultiTaskDirectoryManager {
   private docsPath: string;
   private tasksBasePath: string;
+  private panelRenderer: PanelRenderer;
 
   constructor(docsPath: string) {
     if (!docsPath || docsPath.trim() === '') {
@@ -28,6 +30,7 @@ export class MultiTaskDirectoryManager {
     }
     this.docsPath = docsPath.trim();
     this.tasksBasePath = path.join(this.docsPath, 'tasks');
+    this.panelRenderer = createPanelRenderer();
   }
 
   /**
@@ -429,105 +432,70 @@ export class MultiTaskDirectoryManager {
   // 私有辅助方法
 
   /**
-   * 生成当前任务的Markdown文档
+   * 生成当前任务的Markdown文档（使用 PanelRenderer）
    */
   private generateCurrentTaskMarkdown(task: CurrentTask): string {
-    const lines = [
-      `# ${task.title}`,
-      '',
-      `> **任务ID**: ${task.id}`,
-      `> **创建时间**: ${task.created_at}`,
-      `> **更新时间**: ${task.updated_at}`,
-      task.completed_at ? `> **完成时间**: ${task.completed_at}` : '',
-      '',
-      '## 验收标准',
-      '',
-      task.goal,
-      '',
-    ];
+    // 将 CurrentTask 转换为 ParsedPanel 格式
+    const panelData = this.convertTaskToPanelData(task);
 
-    // 添加任务级提示
-    if (task.task_hints && task.task_hints.length > 0) {
-      lines.push('## 任务提示');
-      lines.push('');
-      task.task_hints.forEach((hint) => {
-        lines.push(`- ${hint}`);
-      });
-      lines.push('');
-    }
+    // 使用 PanelRenderer 渲染
+    return this.panelRenderer.renderToMarkdown(panelData);
+  }
 
-    // 添加整体计划
-    lines.push('## 整体计划');
-    lines.push('');
-
-    if (task.overall_plan && task.overall_plan.length > 0) {
-      task.overall_plan.forEach((plan, index) => {
-        const status = this.getStatusIcon(plan.status);
-        const isCurrentPlan = plan.id === task.current_plan_id;
-        const planTitle = isCurrentPlan
-          ? `**${plan.description}** (当前)`
-          : plan.description;
-
-        lines.push(`${index + 1}. ${status} ${planTitle}`);
-
-        // 添加计划级提示
-        if (plan.hints && plan.hints.length > 0) {
-          lines.push('   > 提示:');
-          plan.hints.forEach((hint) => {
-            lines.push(`   > - ${hint}`);
-          });
-        }
-
-        // 添加步骤
-        if (plan.steps && plan.steps.length > 0) {
-          plan.steps.forEach((step) => {
-            const stepStatus = this.getStatusIcon(step.status);
-            lines.push(`   - ${stepStatus} ${step.description}`);
-
-            // 添加步骤级提示
-            if (step.hints && step.hints.length > 0) {
-              lines.push('     > 提示:');
-              step.hints.forEach((hint) => {
-                lines.push(`     > - ${hint}`);
-              });
-            }
-
-            // 添加证据和备注
-            if (step.evidence) {
-              lines.push(`     > 证据: ${step.evidence}`);
-            }
-            if (step.notes) {
-              lines.push(`     > 备注: ${step.notes}`);
-            }
-          });
-        }
-        lines.push('');
-      });
-    } else {
-      lines.push('暂无计划');
-      lines.push('');
-    }
-
-    // 添加关键日志（最近5条）
-    if (task.logs && task.logs.length > 0) {
-      lines.push('## 关键日志');
-      lines.push('');
-      const recentLogs = task.logs.slice(-5);
-      recentLogs.forEach((log) => {
-        const timestamp = new Date(log.timestamp).toLocaleString();
-        lines.push(`- **${timestamp}** [${log.level}] ${log.message}`);
-        if (log.ai_notes) {
-          lines.push(`  > ${log.ai_notes}`);
-        }
-      });
-      lines.push('');
-    }
-
-    lines.push('---');
-    lines.push('');
-    lines.push('*由 WaveForge MCP 任务管理系统自动生成*');
-
-    return lines.filter((line) => line !== null).join('\n');
+  /**
+   * 将 CurrentTask 转换为 ParsedPanel 格式
+   */
+  private convertTaskToPanelData(task: CurrentTask): any {
+    return {
+      title: task.title,
+      taskId: task.id,
+      references: task.knowledge_refs || [],
+      requirements: [task.goal],
+      issues: [],
+      hints: task.task_hints || [],
+      plans: (task.overall_plan || []).map(plan => ({
+        id: plan.id,
+        text: plan.description,
+        status: plan.status,
+        hints: plan.hints || [],
+        contextTags: plan.contextTags || [],
+        evrBindings: plan.evrBindings || [],
+        steps: (plan.steps || []).map(step => ({
+          id: step.id,
+          text: step.description,
+          status: step.status,
+          hints: step.hints || [],
+          contextTags: step.contextTags || [],
+          usesEVR: [],
+        })),
+      })),
+      evrs: (task.expectedResults || []).map(evr => ({
+        id: evr.id,
+        title: evr.title,
+        verify: evr.verify,
+        expect: evr.expect,
+        status: evr.status,
+        class: evr.class,
+        lastRun: evr.lastRun,
+        notes: evr.notes,
+        proof: evr.proof,
+        referencedBy: evr.referencedBy || [],
+      })),
+      logs: (task.logs || []).map(log => ({
+        timestamp: log.timestamp,
+        level: log.level,
+        category: log.category,
+        action: log.action,
+        message: log.message,
+        aiNotes: log.ai_notes,
+      })),
+      metadata: {
+        createdAt: task.created_at,
+        updatedAt: task.updated_at,
+        completedAt: task.completed_at,
+        currentPlanId: task.current_plan_id,
+      },
+    };
   }
 
   /**
@@ -543,23 +511,6 @@ export class MultiTaskDirectoryManager {
         error: error instanceof Error ? error.message : String(error),
       });
       throw error;
-    }
-  }
-
-  /**
-   * 获取状态图标
-   */
-  private getStatusIcon(status: string): string {
-    switch (status) {
-      case 'completed':
-        return '✅';
-      case 'in_progress':
-        return '🔄';
-      case 'blocked':
-        return '🚫';
-      case 'to_do':
-      default:
-        return '⏳';
     }
   }
 

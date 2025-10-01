@@ -1309,6 +1309,10 @@ export enum CheckboxState {
 export interface ParsedPanel {
   /** 任务标题 */
   title: string;
+  /** 任务 ID */
+  taskId?: string;
+  /** 引用列表 */
+  references?: string[];
   /** 需求列表 */
   requirements: string[];
   /** 问题列表 */

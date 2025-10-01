@@ -1033,8 +1033,12 @@ export class PanelParser {
         const sectionTitle = trimmedLine.replace(/^#+\s*/, '').toLowerCase();
 
         if (trimmedLine.startsWith('# ')) {
-          // 这是一级标题
-          sections.set(PanelSection.Title, [trimmedLine.substring(2)]);
+          // 这是一级标题，去掉 "Task: " 前缀（如果有）
+          let title = trimmedLine.substring(2);
+          if (title.startsWith('Task: ')) {
+            title = title.substring(6);
+          }
+          sections.set(PanelSection.Title, [title]);
           currentSection = null;
         } else if (
           sectionTitle.includes('验收标准') ||
@@ -1055,12 +1059,14 @@ export class PanelParser {
         } else if (
           sectionTitle.includes('计划') ||
           sectionTitle.includes('plans') ||
-          sectionTitle.includes('整体计划')
+          sectionTitle.includes('整体计划') ||
+          sectionTitle.includes('plans & steps')
         ) {
           currentSection = PanelSection.Plans;
         } else if (
           sectionTitle.includes('evr') ||
-          sectionTitle.includes('预期结果')
+          sectionTitle.includes('预期结果') ||
+          sectionTitle.includes('expected visible results')
         ) {
           currentSection = PanelSection.EVRs;
         } else if (
@@ -1746,7 +1752,7 @@ export class PanelParser {
       // 选择最近的序号路径
       const closestNumberPath = nearbyNumberPaths.reduce((closest, current) =>
         Math.abs(current.line - lineNumber) <
-        Math.abs(closest.line - lineNumber)
+          Math.abs(closest.line - lineNumber)
           ? current
           : closest
       );
