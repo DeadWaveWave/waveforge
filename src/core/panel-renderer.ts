@@ -157,7 +157,7 @@ export class PanelRenderer {
       // 渲染计划主行
       let planLine = `${planNumber}. ${checkbox} ${plan.text}`;
       if (this.options.injectAnchors && plan.anchor) {
-        planLine += ` <!-- ${plan.anchor} -->`;
+        planLine += ` <!-- plan:${plan.anchor} -->`;
       }
       lines.push(planLine);
 
@@ -188,7 +188,7 @@ export class PanelRenderer {
 
           let stepLine = `${this.options.indentString}${planNumber}.${stepNumber} ${stepCheckbox} ${step.text}`;
           if (this.options.injectAnchors && step.anchor) {
-            stepLine += ` <!-- ${step.anchor} -->`;
+            stepLine += ` <!-- step:${step.anchor} -->`;
           }
           lines.push(stepLine);
 

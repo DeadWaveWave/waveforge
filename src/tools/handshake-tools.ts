@@ -128,6 +128,7 @@ export class ProjectInfoTool extends BaseHandshakeTool {
           message: '当前会话未连接项目，请先调用 connect_project',
           next_action: {
             tool: 'connect_project',
+            description: '连接项目到当前会话',
             required_params: ['project_path'],
             example: {
               project_path: '/path/to/your/project',
@@ -198,7 +199,8 @@ export class ProjectInfoTool extends BaseHandshakeTool {
         }
       );
 
-      return this.createSuccessResponse({
+      // 构建响应数据
+      const responseData: any = {
         connected: true,
         project: {
           id: projectInfo.project.id,
@@ -212,7 +214,27 @@ export class ProjectInfoTool extends BaseHandshakeTool {
           connected_at: new Date().toISOString(), // 实际应该从 ProjectManager 获取
           session_id: 'session-' + Date.now(), // 临时实现
         },
-      });
+      };
+
+      // 如果没有活动任务，添加 next_action 指导
+      if (!activeTask) {
+        responseData.next_action = {
+          tool: 'current_task_init',
+          description: '创建新任务以开始工作',
+          required_params: ['title', 'goal'],
+          example: {
+            title: '实现新功能',
+            goal: '完成用户故事 #123 的实现',
+          },
+        };
+      } else {
+        responseData.next_action = {
+          tool: 'project_info',
+          description: '可以继续操作当前任务',
+        };
+      }
+
+      return this.createSuccessResponse(responseData);
     } catch (error) {
       this.logOperation(
         LogCategory.Exception,
@@ -236,6 +258,7 @@ export class ProjectInfoTool extends BaseHandshakeTool {
           message: '项目连接已失效，请重新连接',
           next_action: {
             tool: 'connect_project',
+            description: '连接项目到当前会话',
             required_params: ['project_path'],
           },
         });
@@ -342,6 +365,10 @@ export class ConnectProjectTool extends BaseHandshakeTool {
           origin: result.project!.origin,
         },
         message: '项目连接成功',
+        next_action: {
+          tool: 'project_info',
+          description: '查看连接状态和活动任务',
+        },
         next_steps: [
           '可以调用 project_info 查看连接状态',
           '可以调用 current_task_init 创建新任务',
@@ -360,13 +387,11 @@ export class ConnectProjectTool extends BaseHandshakeTool {
       );
 
       if (error instanceof ValidationError) {
-        return this.createErrorResponse(ErrorCode.INVALID_ROOT, error.message, {
-          next_action: 'connect_project',
-          required_params: ['project_path'],
-          example: {
-            project_path: '/absolute/path/to/project',
-          },
-        });
+        return this.createErrorResponse(
+          ErrorCode.INVALID_ROOT,
+          error.message,
+          this.getRecoveryGuidance(ErrorCode.INVALID_ROOT)
+        );
       }
 
       const errorResponse = errorHandler.handleError(error, {
@@ -453,10 +478,11 @@ export class ConnectProjectTool extends BaseHandshakeTool {
       case ErrorCode.INVALID_ROOT:
         return {
           next_action: 'connect_project',
+          description: '使用有效的项目路径重新连接',
           required_params: ['project_path'],
           suggestions: [
+            '确保路径存在且可访问',
             '确保提供的路径是绝对路径',
-            '确保路径指向一个存在的目录',
             '确保对该目录有读写权限',
           ],
           example: {
@@ -557,6 +583,7 @@ export class HandshakeChecker {
                 message: '未连接项目，请先调用 connect_project',
                 recovery: {
                   next_action: 'connect_project',
+                  description: '连接项目到当前会话',
                   required_params: ['project_path'],
                   example: {
                     project_path: '/path/to/your/project',

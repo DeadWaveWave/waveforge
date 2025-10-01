@@ -219,6 +219,8 @@ export interface TaskPlan {
   id: string;
   /** 计划描述 */
   description: string;
+  /** 计划描述别名（用于API兼容性，等同于 description） */
+  text?: string;
   /** 计划状态 */
   status: TaskStatus;
   /** 完成证据链接（可选） */
@@ -1172,7 +1174,7 @@ export interface ResolvedConflict extends SyncConflict {
  */
 export interface SyncChange {
   /** 变更类型 */
-  type: 'content' | 'structure';
+  type: 'content' | 'structure' | 'status';
   /** 变更区域 */
   section: string;
   /** 变更字段 */

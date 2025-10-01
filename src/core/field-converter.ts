@@ -98,6 +98,9 @@ export const FIELD_MAPPING: Record<string, string> = {
   updateType: 'update_type',
   changeType: 'change_type',
 
+  // 计划和步骤字段（保持 description，但在响应格式化时添加 text 别名）
+  text: 'text', // 用于兼容旧API，映射到 description
+
   // 项目相关
   projectId: 'project_id',
   projectPath: 'project_path',

@@ -128,7 +128,7 @@ export interface TaskModifyParams {
   };
 
   // 通用参数
-  op?: 'replace' | 'append' | 'insert' | 'remove' | 'update';
+  op?: 'replace' | 'append' | 'insert' | 'remove' | 'update' | 'add';
   hints?: string[];
   tags?: ContextTag[];
 }
@@ -186,7 +186,9 @@ export class TaskManager {
     this.evrValidator = createEVRValidator();
     this.lazySync = createLazySync();
     this.panelRenderer = createPanelRenderer();
-    this.panelParser = createPanelParser();
+    this.panelParser = createPanelParser({
+      generateMissingAnchors: false, // 禁用自动生成锚点，因为 PanelRenderer 已经生成了正确的锚点
+    });
   }
 
   getDocsPath(): string {
@@ -205,16 +207,12 @@ export class TaskManager {
       const fs = require('fs');
       const path = require('path');
 
-      // 检查 .wave/current-task.md 是否存在
-      const panelPath = path.join(
-        path.dirname(this.docsPath),
-        'current-task.md'
-      );
-      if (fs.existsSync(panelPath)) {
-        return panelPath;
-      }
+      // current-task.md 应该在 .wave 目录下
+      const panelPath = path.join(this.docsPath, 'current-task.md');
 
-      return null;
+      // 不检查文件是否存在，直接返回路径
+      // 这样在同步检测时可以正确找到路径
+      return panelPath;
     } catch (error) {
       return null;
     }
@@ -280,14 +278,26 @@ export class TaskManager {
    * 解析项目特定的文档路径
    */
   private async resolveProjectPath(projectId?: string): Promise<string> {
-    if (!this.projectManager || !projectId) {
+    if (!this.projectManager) {
       return this.docsPath;
+    }
+
+    // 如果没有提供 projectId,尝试从当前活动项目获取
+    let effectiveProjectId = projectId;
+    if (!effectiveProjectId) {
+      const activeProject = this.projectManager.getActiveProject();
+      if (activeProject) {
+        effectiveProjectId = activeProject.root;
+      } else {
+        // 没有活动项目,使用默认路径
+        return this.docsPath;
+      }
     }
 
     try {
       // 如果提供了项目ID，尝试从项目注册表解析项目根目录
       const projectRegistry = this.projectManager.getProjectRegistry();
-      const projectRecord = await projectRegistry.resolveProject(projectId);
+      const projectRecord = await projectRegistry.resolveProject(effectiveProjectId);
 
       if (projectRecord) {
         return path.join(projectRecord.root, '.wave');
@@ -299,7 +309,7 @@ export class TaskManager {
         LogAction.Handle,
         '项目路径解析失败，使用默认路径',
         {
-          projectId,
+          projectId: effectiveProjectId,
           error: error instanceof Error ? error.message : String(error),
         }
       );
@@ -404,7 +414,7 @@ export class TaskManager {
   /**
    * 执行 Lazy 同步
    */
-  private async performLazySync(task: CurrentTask): Promise<any | null> {
+  private async performLazySync(task: CurrentTask, projectId?: string): Promise<any | null> {
     try {
       const panelPath = this.getCurrentTaskPanelPath();
       if (!panelPath) {
@@ -418,10 +428,48 @@ export class TaskManager {
         return null;
       }
 
+      // 获取面板文件的修改时间
+      let panelModTime: string | undefined;
+      try {
+        const stats = await fs.stat(panelPath);
+        panelModTime = stats.mtime.toISOString();
+      } catch (error) {
+        // 忽略获取文件时间的错误
+      }
+
+      // 将 CurrentTask 转换为 TaskData 格式（匹配 LazySync 期望的结构）
+      const taskData: any = {
+        id: task.id,
+        title: task.title,
+        goal: task.goal,
+        requirements: task.goal ? [task.goal] : [], // goal 映射为 requirements 数组
+        issues: [],
+        hints: task.task_hints || [],
+        plans: task.overall_plan || [],
+        expectedResults: task.expectedResults || [],
+        createdAt: task.created_at,
+        updatedAt: task.updated_at,
+        projectId: this.projectManager?.getActiveProject()?.root || '',
+        panelModTime, // 传递面板修改时间
+      };
+
       // 检测差异
-      const diff = this.lazySync.detectDifferences(panelContent, task as any);
+      const diff = this.lazySync.detectDifferences(panelContent, taskData);
+
       if (!diff.hasChanges || diff.contentChanges.length === 0) {
-        // 没有可写的内容变更，无需同步
+        // 检查是否有状态变更
+        if (diff.statusChanges && diff.statusChanges.length > 0) {
+          // 只有状态变更，返回包含状态变更的预览信息
+          return {
+            applied: false,
+            changes: [],
+            statusChanges: diff.statusChanges,
+            conflicts: [],
+            auditEntries: [],
+            mdVersion: '',
+          };
+        }
+        // 没有任何变更，无需同步
         return null;
       }
 
@@ -431,13 +479,40 @@ export class TaskManager {
       // 将变更应用到任务数据
       this.applyContentChangesToTask(task, syncResult.changes);
 
+      // 将审计日志添加到任务日志中
+      if (syncResult.auditEntries && syncResult.auditEntries.length > 0) {
+        for (const auditEntry of syncResult.auditEntries) {
+          const log: TaskLog = {
+            timestamp: auditEntry.timestamp,
+            level: LogLevel.Info,
+            category: LogCategory.Task,
+            action: LogAction.Handle,
+            message: auditEntry.type === 'conflict' ? '冲突解决完成' : 'Lazy 同步完成',
+            ai_notes: JSON.stringify(auditEntry.details),
+            details: {
+              type: auditEntry.type,
+              affectedIds: auditEntry.affectedIds,
+              ...auditEntry.details,
+            },
+          };
+          task.logs.push(log);
+        }
+      }
+
+      // 持久化变更到文件系统
+      await this.saveTask(task, projectId);
+
       logger.info(LogCategory.Task, LogAction.Update, 'Lazy 同步完成', {
         changesCount: syncResult.changes.length,
         conflictsCount: syncResult.conflicts.length,
         affectedSections: [...new Set(syncResult.changes.map(c => c.section))],
       });
 
-      return syncResult;
+      // 返回完整的同步结果，包括状态变更
+      return {
+        ...syncResult,
+        statusChanges: diff.statusChanges || [],
+      };
     } catch (error) {
       logger.error(LogCategory.Task, LogAction.Handle, 'Lazy 同步失败', {
         error: error instanceof Error ? error.message : String(error),
@@ -454,11 +529,23 @@ export class TaskManager {
     for (const change of changes) {
       try {
         // 根据变更类型应用到任务数据
-        if (change.section.startsWith('plan-')) {
+        if (change.section === 'title' && change.field === 'title') {
+          // 任务标题
+          task.title = change.newValue;
+        } else if (change.section === 'requirements' && change.field === 'requirements') {
+          // 任务目标（requirements 对应 goal 字段）
+          // requirements 可能是字符串或数组，取第一个元素或整个字符串
+          if (Array.isArray(change.newValue) && change.newValue.length > 0) {
+            task.goal = change.newValue.join('\n');
+          } else if (typeof change.newValue === 'string') {
+            task.goal = change.newValue;
+          }
+        } else if (change.section.startsWith('plan-')) {
           const planId = change.section;
           const plan = task.overall_plan.find(p => p.id === planId);
           if (plan && change.field === 'description') {
             plan.description = change.newValue;
+            plan.text = change.newValue; // 同时更新 text 别名
           }
         } else if (change.section.startsWith('evr-')) {
           const evrId = change.section;
@@ -519,10 +606,9 @@ export class TaskManager {
       result.hints = this.getActiveHints(task, params);
 
       // 添加同步预览信息（如果有变更）
-      if (syncResult && syncResult.changes.length > 0) {
-        result.sync_preview = {
-          applied: true,
-          changes: syncResult.changes.map((change: any) => ({
+      if (syncResult) {
+        const allChanges: any[] = [
+          ...syncResult.changes.map((change: any) => ({
             type: 'content' as const,
             section: change.section,
             field: change.field,
@@ -530,15 +616,34 @@ export class TaskManager {
             newValue: change.newValue,
             source: change.source,
           })),
-          conflicts: syncResult.conflicts.map((conflict: any) => ({
-            region: conflict.region,
-            field: conflict.field,
-            reason: conflict.reason,
-            oursTs: conflict.oursTs,
-            theirsTs: conflict.theirsTs,
-          })),
-          affectedSections: [...new Set(syncResult.changes.map((c: any) => c.section))] as string[],
-        };
+        ];
+
+        // 将状态变更添加到 changes 中
+        if (syncResult.statusChanges && syncResult.statusChanges.length > 0) {
+          allChanges.push(...syncResult.statusChanges.map((statusChange: any) => ({
+            type: 'status' as const,
+            section: statusChange.target === 'plan' ? statusChange.id : `${statusChange.target}:${statusChange.id}`,
+            field: 'status',
+            oldValue: statusChange.oldStatus,
+            newValue: statusChange.newStatus,
+            source: 'panel' as const,
+          })));
+        }
+
+        if (allChanges.length > 0 || (syncResult.conflicts && syncResult.conflicts.length > 0)) {
+          result.sync_preview = {
+            applied: syncResult.applied || false,
+            changes: allChanges,
+            conflicts: syncResult.conflicts.map((conflict: any) => ({
+              region: conflict.region,
+              field: conflict.field,
+              reason: conflict.reason,
+              oursTs: conflict.oursTs,
+              theirsTs: conflict.theirsTs,
+            })),
+            affectedSections: [...new Set(allChanges.map((c: any) => c.section))] as string[],
+          };
+        }
       }
 
       return result;
@@ -562,6 +667,9 @@ export class TaskManager {
       if (!task) {
         throw new Error('当前没有活跃的任务');
       }
+
+      // 执行 Lazy 同步（在修改前应用面板变更）
+      await this.performLazySync(task);
 
       const timestamp = new Date().toISOString();
       let result: TaskModifyResult;
@@ -607,7 +715,11 @@ export class TaskManager {
       // 首先检查并执行自动迁移
       await this.checkAndPerformMigration();
 
-      const taskPath = await this.resolveTaskPath(projectId);
+      // 如果没有传入 projectId，尝试从当前活动项目获取
+      const effectiveProjectId =
+        projectId || this.projectManager?.getActiveProject()?.root;
+
+      const taskPath = await this.resolveTaskPath(effectiveProjectId);
 
       // 检查文件是否存在
       if (!(await fs.pathExists(taskPath))) {
@@ -629,7 +741,14 @@ export class TaskManager {
 
       this.validateTaskDataStructure(taskData);
 
-      return taskData as CurrentTask;
+      const task = taskData as CurrentTask;
+
+      // 执行 Lazy 同步（如果有面板修改）
+      await this.performLazySync(task, effectiveProjectId);
+
+      // 重新加载任务以获取同步后的最新数据
+      const updatedData = await fs.readFile(taskPath, 'utf8');
+      return JSON.parse(updatedData) as CurrentTask;
     } catch (error) {
       if (
         error instanceof Error &&
@@ -901,9 +1020,11 @@ export class TaskManager {
     timestamp: string,
     index?: number
   ): TaskPlan {
+    const desc = description.trim();
     return {
       id: index !== undefined ? `plan-${index + 1}` : `plan-${ulid()}`,
-      description: description.trim(),
+      description: desc,
+      text: desc, // 兼容性别名，用于旧API
       status: TaskStatus.ToDo,
       hints: [],
       steps: [],
@@ -1041,6 +1162,7 @@ export class TaskManager {
       hints: task.task_hints || [],
       plans: (task.overall_plan || []).map(plan => ({
         id: plan.id,
+        anchor: plan.id, // 添加锚点以便 PanelParser 识别
         text: plan.description,
         status: plan.status,
         hints: plan.hints || [],
@@ -1048,6 +1170,7 @@ export class TaskManager {
         evrBindings: plan.evrBindings || [],
         steps: (plan.steps || []).map(step => ({
           id: step.id,
+          anchor: step.id, // 添加锚点以便 PanelParser 识别
           text: step.description,
           status: step.status,
           hints: step.hints || [],
@@ -1940,6 +2063,15 @@ export class TaskManager {
     let operationCount = 0;
     let operationType = 'update';
 
+    // 处理 plan_no 参数（用于绑定 EVR 到计划）
+    let targetPlan: TaskPlan | undefined;
+    if (params.plan_id) {
+      targetPlan = task.overall_plan.find(p => p.id === params.plan_id);
+      if (!targetPlan) {
+        throw new Error(`计划 ${params.plan_id} 不存在`);
+      }
+    }
+
     // 处理 EVR 内容修改
     if (params.evr.items && params.evr.items.length > 0) {
       for (const item of params.evr.items) {
@@ -1983,6 +2115,20 @@ export class TaskManager {
           affectedIds.push(newEVR.id);
           operationCount++;
           operationType = 'create';
+
+          // 如果指定了目标计划，将 EVR 绑定到该计划
+          if (targetPlan) {
+            if (!targetPlan.evrBindings) {
+              targetPlan.evrBindings = [];
+            }
+            targetPlan.evrBindings.push(newEVR.id);
+
+            // 更新 EVR 的 referencedBy
+            if (!newEVR.referencedBy) {
+              newEVR.referencedBy = [];
+            }
+            newEVR.referencedBy.push(targetPlan.id);
+          }
         }
       }
     }

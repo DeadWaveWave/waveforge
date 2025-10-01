@@ -34,6 +34,7 @@ import {
   TaskStatus,
   LogCategory,
   LogAction,
+  SyncConflictType,
   type EVRSummary,
   type EVRDetail,
   type SyncPreview,
@@ -253,6 +254,17 @@ export class CurrentTaskUpdateTool extends BaseTaskTool {
         }
       );
 
+      // 如果结果是失败（例如EVR门槛检查未通过），返回非success响应
+      if (result.success === false) {
+        return this.createSuccessResponse({
+          success: false,
+          current_plan_id: result.current_plan_id,
+          evr_pending: result.evr_pending,
+          evr_for_plan: result.evr_for_plan,
+          message: 'EVR 验证未完成，无法完成计划',
+        });
+      }
+
       return this.createSuccessResponse({
         current_plan_id: result.current_plan_id,
         next_step: result.next_step,
@@ -460,7 +472,7 @@ export class CurrentTaskReadTool extends BaseTaskTool {
   /**
    * 检查面板同步状态（仅干运行预览）
    */
-  private async checkPanelSync(_task: any): Promise<{
+  private async checkPanelSync(task: any): Promise<{
     hasPendingChanges: boolean;
     preview?: SyncPreview;
   }> {
@@ -471,11 +483,50 @@ export class CurrentTaskReadTool extends BaseTaskTool {
         return { hasPendingChanges: false };
       }
 
-      // 这里应该读取面板内容，但由于我们还没有实现面板文件系统
-      // 暂时返回无变更状态
-      // TODO: 实现面板内容读取和差异检测
+      // 检查面板文件是否存在
+      const fs = await import('fs-extra');
+      if (!(await fs.pathExists(panelPath))) {
+        return { hasPendingChanges: false };
+      }
 
-      return { hasPendingChanges: false };
+      // 读取面板内容
+      const panelContent = await fs.readFile(panelPath, 'utf8');
+      if (!panelContent || panelContent.trim() === '') {
+        return { hasPendingChanges: false };
+      }
+
+      // 使用 LazySync 检测差异（干运行模式）
+      const diff = this.lazySync.detectDifferences(panelContent, task);
+
+      if (!diff.hasChanges || diff.contentChanges.length === 0) {
+        return { hasPendingChanges: false };
+      }
+
+      // 创建同步预览（applied=false 表示仅预览）
+      const preview: SyncPreview = {
+        applied: false,
+        changes: diff.contentChanges.map((change: any) => ({
+          type: 'content' as const,
+          section: change.section,
+          field: change.field,
+          oldValue: change.oldValue,
+          newValue: change.newValue,
+          source: change.source,
+        })),
+        conflicts: diff.statusChanges.map((stateChange: any) => ({
+          region: stateChange.section,
+          field: 'status',
+          reason: SyncConflictType.ConcurrentUpdate,
+          oursTs: task.updated_at,
+          theirsTs: new Date().toISOString(),
+        })),
+        affectedSections: [...new Set(diff.contentChanges.map((c: any) => c.section))] as string[],
+      };
+
+      return {
+        hasPendingChanges: true,
+        preview,
+      };
     } catch (error) {
       // 如果检测失败，记录错误但不影响主流程
       this.logOperation(
@@ -586,12 +637,29 @@ export class CurrentTaskModifyTool extends BaseTaskTool {
       // 参数验证
       this.validateParams('current_task_modify', params);
 
-      // 验证条件逻辑
-      if (params.field === 'steps' && !params.plan_id) {
-        throw new ValidationError('修改步骤时需要提供plan_id');
+      // 处理 plan_no 参数（将序号转换为 plan_id）
+      let planId = params.plan_id;
+      if (params.plan_no !== undefined && !planId) {
+        // 如果提供了 plan_no 但没有 plan_id，则需要先获取当前任务来查找对应的 plan_id
+        const task = await this.taskManager.getCurrentTask(params.project_id);
+        if (!task) {
+          throw new ValidationError('当前没有活跃任务');
+        }
+
+        const planIndex = params.plan_no - 1; // plan_no 从 1 开始
+        if (planIndex < 0 || planIndex >= task.overall_plan.length) {
+          throw new ValidationError(`plan_no ${params.plan_no} 超出范围（1-${task.overall_plan.length}）`);
+        }
+
+        planId = task.overall_plan[planIndex].id;
       }
-      if (params.field === 'hints' && params.step_id && !params.plan_id) {
-        throw new ValidationError('修改步骤级提示时需要提供plan_id');
+
+      // 验证条件逻辑
+      if (params.field === 'steps' && !planId) {
+        throw new ValidationError('修改步骤时需要提供plan_id或plan_no');
+      }
+      if (params.field === 'hints' && params.step_id && !planId) {
+        throw new ValidationError('修改步骤级提示时需要提供plan_id或plan_no');
       }
 
       this.logOperation(
@@ -602,6 +670,8 @@ export class CurrentTaskModifyTool extends BaseTaskTool {
           field: params.field,
           changeType: params.change_type,
           reason: params.reason,
+          planNo: params.plan_no,
+          planId: planId,
         }
       );
 
@@ -610,7 +680,7 @@ export class CurrentTaskModifyTool extends BaseTaskTool {
         field: params.field,
         content: params.content,
         reason: params.reason,
-        plan_id: params.plan_id,
+        plan_id: planId,  // 使用转换后的 plan_id
         step_id: params.step_id,
         change_type: params.change_type,
         project_id: params.project_id,

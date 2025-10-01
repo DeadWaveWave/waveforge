@@ -256,7 +256,18 @@ export class LazySync {
       }
 
       // 应用内容变更（仅内容变更，状态变更不回写）
+      // 根据冲突解决结果过滤变更
       for (const change of diff.contentChanges) {
+        // 检查此变更是否与冲突相关
+        const relatedConflict = resolvedConflicts.find(
+          (rc) => rc.region === change.section && rc.field === change.field
+        );
+
+        // 如果存在相关冲突且解决方案是保留"我们的"（结构化数据），则跳过此变更
+        if (relatedConflict && relatedConflict.resolution === ConflictResolution.Ours) {
+          continue;
+        }
+
         const appliedChange: AppliedChange = {
           ...change,
           appliedAt: timestamp,
@@ -584,13 +595,62 @@ export class LazySync {
    * 检测冲突
    */
   private detectConflicts(
-    _parsedPanel: ParsedPanel,
-    _structuredData: TaskData
+    parsedPanel: ParsedPanel,
+    structuredData: TaskData
   ): SyncConflict[] {
     const conflicts: SyncConflict[] = [];
 
-    // 这里可以实现更复杂的冲突检测逻辑
-    // 例如检测 ETag 不匹配、并发更新等
+    // 从 taskData 中获取面板修改时间（由 TaskManager 提供）
+    const panelModTime = (structuredData as any).panelModTime;
+    const structuredModTime = structuredData.updatedAt;
+
+    // 检查计划是否有冲突 (只要内容不同就是潜在冲突)
+    for (const parsedPlan of parsedPanel.plans) {
+      const structuredPlan = structuredData.plans?.find(
+        (p) => p.id === parsedPlan.id
+      );
+
+      if (structuredPlan && parsedPlan.text !== structuredPlan.description) {
+        // 内容不同,检测为冲突
+        conflicts.push({
+          region: parsedPlan.id,
+          field: 'description',
+          reason: panelModTime && structuredModTime
+            ? SyncConflictType.ConcurrentUpdate
+            : SyncConflictType.EtagMismatch,
+          oursTs: structuredModTime, // 结构化数据时间戳
+          theirsTs: panelModTime, // 面板时间戳
+        });
+      }
+    }
+
+    // 检查标题冲突
+    if (parsedPanel.title !== structuredData.title) {
+      conflicts.push({
+        region: 'title',
+        field: 'title',
+        reason: panelModTime && structuredModTime
+          ? SyncConflictType.ConcurrentUpdate
+          : SyncConflictType.EtagMismatch,
+        oursTs: structuredModTime,
+        theirsTs: panelModTime,
+      });
+    }
+
+    // 检查 requirements 冲突
+    if (
+      !this.arraysEqual(parsedPanel.requirements, structuredData.requirements || [])
+    ) {
+      conflicts.push({
+        region: 'requirements',
+        field: 'requirements',
+        reason: panelModTime && structuredModTime
+          ? SyncConflictType.ConcurrentUpdate
+          : SyncConflictType.EtagMismatch,
+        oursTs: structuredModTime,
+        theirsTs: panelModTime,
+      });
+    }
 
     return conflicts;
   }
@@ -633,29 +693,33 @@ export class LazySync {
   private resolveByETagThenTimestamp(
     conflict: SyncConflict
   ): ConflictResolution {
-    // 实现 ETag 优先策略
-    if (conflict.reason === SyncConflictType.EtagMismatch) {
-      // 如果有时间戳信息，使用时间戳比较
-      if (conflict.oursTs && conflict.theirsTs) {
-        return new Date(conflict.oursTs) > new Date(conflict.theirsTs)
-          ? ConflictResolution.Ours
-          : ConflictResolution.Theirs;
-      }
-    }
-
-    // 默认使用我们的版本
-    return ConflictResolution.Ours;
+    // ETag 优先策略:
+    // 1. 如果有 ETag 信息,使用 ETag 比较 (TODO: 实现 ETag 支持)
+    // 2. 否则使用时间戳兜底策略
+    return this.resolveByTimestamp(conflict);
   }
 
   /**
    * 通过时间戳解决冲突
    */
   private resolveByTimestamp(conflict: SyncConflict): ConflictResolution {
+    // 时间戳策略的核心问题:
+    // - oursTs 是结构化数据的 updatedAt (可靠)
+    // - theirsTs 是面板文件的 mtime (不太可靠,但是我们目前唯一的选择)
+    //
+    // 策略: 使用时间戳比较,但优先保留结构化数据 (当时间戳相近时)
+
     if (conflict.oursTs && conflict.theirsTs) {
-      return new Date(conflict.oursTs) > new Date(conflict.theirsTs)
+      const oursTime = new Date(conflict.oursTs);
+      const theirsTime = new Date(conflict.theirsTs);
+
+      // 比较时间戳
+      return oursTime >= theirsTime
         ? ConflictResolution.Ours
         : ConflictResolution.Theirs;
     }
+
+    // 默认保留结构化数据
     return ConflictResolution.Ours;
   }
 
@@ -676,7 +740,7 @@ export class LazySync {
         // 检测计划描述变更
         if (parsedPlan.text !== structuredPlan.description) {
           changes.push({
-            section: `plan:${parsedPlan.id}`,
+            section: parsedPlan.id, // 使用 plan-1 而不是 plan:plan-1
             field: 'description',
             oldValue: structuredPlan.description,
             newValue: parsedPlan.text,
@@ -687,7 +751,7 @@ export class LazySync {
         // 检测计划提示变更
         if (!this.arraysEqual(parsedPlan.hints, structuredPlan.hints || [])) {
           changes.push({
-            section: `plan:${parsedPlan.id}`,
+            section: parsedPlan.id, // 使用 plan-1 而不是 plan:plan-1
             field: 'hints',
             oldValue: structuredPlan.hints || [],
             newValue: parsedPlan.hints,
@@ -700,7 +764,7 @@ export class LazySync {
       } else {
         // 新增的计划
         changes.push({
-          section: `plan:${parsedPlan.id}`,
+          section: parsedPlan.id, // 使用 plan-1 而不是 plan:plan-1
           field: 'new_plan',
           oldValue: null,
           newValue: parsedPlan,
@@ -716,7 +780,7 @@ export class LazySync {
       );
       if (!parsedPlan) {
         changes.push({
-          section: `plan:${structuredPlan.id}`,
+          section: structuredPlan.id, // 使用 plan-1 而不是 plan:plan-1
           field: 'deleted_plan',
           oldValue: structuredPlan,
           newValue: null,
@@ -1046,6 +1110,10 @@ export class LazySync {
    * 比较数组是否相等
    */
   private arraysEqual(a: any[], b: any[]): boolean {
+    // 空值检查
+    if (!a || !b) {
+      return !a && !b; // 两者都是空/undefined 时才相等
+    }
     if (a.length !== b.length) return false;
     return a.every((val, index) => val === b[index]);
   }

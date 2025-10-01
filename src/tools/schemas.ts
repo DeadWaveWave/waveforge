@@ -376,6 +376,11 @@ export const CurrentTaskModifySchema = {
         type: 'string' as const,
         description: '针对特定计划修改时需要的计划ID',
       },
+      plan_no: {
+        type: 'number' as const,
+        description: '计划序号（从1开始，可替代plan_id使用）',
+        minimum: 1,
+      },
       step_id: {
         type: 'string' as const,
         description: '针对特定步骤修改时需要的步骤ID',
@@ -444,7 +449,7 @@ export const CurrentTaskModifySchema = {
       // 通用参数
       op: {
         type: 'string' as const,
-        enum: ['replace', 'append', 'insert', 'remove', 'update'],
+        enum: ['replace', 'append', 'insert', 'remove', 'update', 'add'],
         description: '操作类型',
       },
       hints: {
