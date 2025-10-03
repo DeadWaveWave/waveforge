@@ -718,7 +718,9 @@ export class CurrentTaskModifyTool extends BaseTaskTool {
         content: params.content,
         reason: params.reason,
         plan_id: planId,  // 使用转换后的 plan_id
+        plan_no: params.plan_no,  // 同时传递 plan_no（供 insert/remove/update 使用）
         step_id: params.step_id,
+        step_no: params.step_no,  // 同时传递 step_no
         change_type: params.change_type,
         project_id: params.project_id,
         evr: params.evr,

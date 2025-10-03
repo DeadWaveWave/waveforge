@@ -111,6 +111,8 @@ export interface TaskModifyParams {
   reason: string;
   plan_id?: string;
   step_id?: string;
+  plan_no?: number;  // 计划序号（从1开始）
+  step_no?: number;  // 步骤序号（从1开始）
   change_type:
   | 'generate_steps'
   | 'plan_adjustment'
@@ -1781,8 +1783,14 @@ export class TaskManager {
           (!params.evr.evrIds || params.evr.evrIds.length === 0))) {
         throw new Error('EVR修改时必须提供evr.items或evr.evrIds');
       }
+    } else if (params.field === 'hints') {
+      // hints 可以通过 params.hints 或 params.content 提供
+      if (!params.hints && !params.content && params.op !== 'remove') {
+        throw new Error('修改提示时必须提供hints或content');
+      }
     } else {
-      if (params.content === undefined || params.content === null) {
+      // remove 操作不需要 content
+      if (params.op !== 'remove' && (params.content === undefined || params.content === null)) {
         throw new Error('修改内容不能为空');
       }
     }
@@ -1804,7 +1812,7 @@ export class TaskManager {
       throw new Error(`无效的变更类型: ${params.change_type}`);
     }
 
-    this.validateContentFormat(params.field, params.content);
+    this.validateContentFormat(params.field, params.content, params.op);
 
     if (params.field === 'steps' && !params.plan_id) {
       throw new Error('修改步骤时必须提供plan_id');
@@ -1817,10 +1825,16 @@ export class TaskManager {
 
   private validateContentFormat(
     field: string,
-    content: string | string[] | undefined
+    content: string | string[] | undefined,
+    op?: string
   ): void {
     // EVR 字段有自己的验证逻辑，跳过通用验证
     if (field === 'evr') {
+      return;
+    }
+
+    // remove 操作不需要 content
+    if (op === 'remove') {
       return;
     }
 
@@ -1914,29 +1928,100 @@ export class TaskManager {
     timestamp: string
   ): Promise<TaskModifyResult> {
     const oldPlanCount = task.overall_plan.length;
-    const newPlanDescriptions = params.content as string[];
+    const op = params.op || 'replace';
+    const affectedIds: string[] = [];
+    const operationType = op;
+    let planReset = false;
 
-    task.overall_plan = newPlanDescriptions.map((description, index) =>
-      this.createTaskPlan(description, timestamp, index)
-    );
+    switch (op) {
+      case 'replace': {
+        const newPlanDescriptions = params.content as string[];
+        task.overall_plan = newPlanDescriptions.map((description, index) =>
+          this.createTaskPlan(description, timestamp, index)
+        );
+        task.current_plan_id =
+          task.overall_plan.length > 0 ? task.overall_plan[0].id : undefined;
+        affectedIds.push(...task.overall_plan.map((p) => p.id));
+        planReset = true;
+        break;
+      }
 
-    task.current_plan_id =
-      task.overall_plan.length > 0 ? task.overall_plan[0].id : undefined;
+      case 'append': {
+        const newPlanDescriptions = params.content as string[];
+        const startIndex = task.overall_plan.length;
+        const newPlans = newPlanDescriptions.map((description, index) =>
+          this.createTaskPlan(description, timestamp, startIndex + index)
+        );
+        task.overall_plan.push(...newPlans);
+        affectedIds.push(...newPlans.map((p) => p.id));
+        break;
+      }
+
+      case 'insert': {
+        const insertIndex = params.plan_no ? params.plan_no - 1 : 0;
+        const newPlanDescriptions = params.content as string[];
+        const newPlans = newPlanDescriptions.map((description, index) =>
+          this.createTaskPlan(description, timestamp, insertIndex + index)
+        );
+        task.overall_plan.splice(insertIndex, 0, ...newPlans);
+        affectedIds.push(...newPlans.map((p) => p.id));
+        break;
+      }
+
+      case 'remove': {
+        if (!params.plan_no) {
+          throw new Error('remove 操作需要 plan_no 参数');
+        }
+        const removeIndex = params.plan_no - 1;
+        if (removeIndex < 0 || removeIndex >= task.overall_plan.length) {
+          throw new Error(`计划索引 ${params.plan_no} 超出范围`);
+        }
+        const removedPlan = task.overall_plan[removeIndex];
+        affectedIds.push(removedPlan.id);
+        task.overall_plan.splice(removeIndex, 1);
+
+        // 如果删除的是当前计划，重置为第一个
+        if (task.current_plan_id === removedPlan.id) {
+          task.current_plan_id =
+            task.overall_plan.length > 0 ? task.overall_plan[0].id : undefined;
+        }
+        break;
+      }
+
+      case 'update': {
+        if (!params.plan_no) {
+          throw new Error('update 操作需要 plan_no 参数');
+        }
+        const updateIndex = params.plan_no - 1;
+        if (updateIndex < 0 || updateIndex >= task.overall_plan.length) {
+          throw new Error(`计划索引 ${params.plan_no} 超出范围`);
+        }
+        const newDescription = (params.content as string[])[0];
+        const plan = task.overall_plan[updateIndex];
+        plan.description = newDescription.trim();
+        affectedIds.push(plan.id);
+        break;
+      }
+
+      default:
+        throw new Error(`不支持的操作类型: ${op}`);
+    }
 
     const log: TaskLog = {
       timestamp,
       level: LogLevel.Info,
       category: LogCategory.Plan,
       action: LogAction.Modify,
-      message: '整体计划修改',
+      message: `计划${operationType}操作`,
       ai_notes: params.reason,
       details: {
         field: 'plan',
         change_type: params.change_type,
         reason: params.reason,
+        operation: operationType,
         old_plan_count: oldPlanCount,
         new_plan_count: task.overall_plan.length,
-        reset_to_first_plan: true,
+        plan_reset: planReset,
       },
     };
     task.logs.push(log);
@@ -1944,8 +2029,8 @@ export class TaskManager {
     return {
       success: true,
       field: 'plan',
-      affected_ids: task.overall_plan.map((p) => p.id),
-      plan_reset: true,
+      affected_ids: affectedIds,
+      plan_reset: planReset,
       new_current_plan_id: task.current_plan_id,
     };
   }
@@ -1961,29 +2046,110 @@ export class TaskManager {
     }
 
     const oldStepCount = plan.steps.length;
-    const newStepDescriptions = params.content as string[];
+    const op = params.op || 'replace';
+    const affectedIds: string[] = [params.plan_id!];
+    const operationType = op;
+    let stepsAdded = 0;
+    let stepsReplaced = false;
+    let firstStepStarted = false;
 
-    plan.steps = newStepDescriptions.map((description, index) => ({
-      id: `step-${index + 1}`,
+    const createStep = (description: string, index: number) => ({
+      id: `step-${Date.now()}-${index}`,
       description: description.trim(),
       status: TaskStatus.ToDo,
       hints: [],
       usesEVR: [],
       contextTags: [],
       created_at: timestamp,
-    }));
+    });
+
+    switch (op) {
+      case 'replace': {
+        const newStepDescriptions = params.content as string[];
+        plan.steps = newStepDescriptions.map((description, index) =>
+          createStep(description, index)
+        );
+        affectedIds.push(...plan.steps.map((s) => s.id));
+        stepsAdded = plan.steps.length;
+        stepsReplaced = oldStepCount > 0;
+
+        // 如果是新添加步骤，设置第一个步骤为进行中
+        if (oldStepCount === 0 && plan.steps.length > 0) {
+          plan.steps[0].status = TaskStatus.InProgress;
+          firstStepStarted = true;
+        }
+        break;
+      }
+
+      case 'append': {
+        const newStepDescriptions = params.content as string[];
+        const startIndex = plan.steps.length;
+        const newSteps = newStepDescriptions.map((description, index) =>
+          createStep(description, startIndex + index)
+        );
+        plan.steps.push(...newSteps);
+        affectedIds.push(...newSteps.map((s) => s.id));
+        stepsAdded = newSteps.length;
+        break;
+      }
+
+      case 'insert': {
+        const insertIndex = params.step_no ? params.step_no - 1 : 0;
+        const newStepDescriptions = params.content as string[];
+        const newSteps = newStepDescriptions.map((description, index) =>
+          createStep(description, insertIndex + index)
+        );
+        plan.steps.splice(insertIndex, 0, ...newSteps);
+        affectedIds.push(...newSteps.map((s) => s.id));
+        stepsAdded = newSteps.length;
+        break;
+      }
+
+      case 'remove': {
+        if (!params.step_no) {
+          throw new Error('remove 操作需要 step_no 参数');
+        }
+        const removeIndex = params.step_no - 1;
+        if (removeIndex < 0 || removeIndex >= plan.steps.length) {
+          throw new Error(`步骤索引 ${params.step_no} 超出范围`);
+        }
+        const removedStep = plan.steps[removeIndex];
+        affectedIds.push(removedStep.id);
+        plan.steps.splice(removeIndex, 1);
+        break;
+      }
+
+      case 'update': {
+        if (!params.step_no) {
+          throw new Error('update 操作需要 step_no 参数');
+        }
+        const updateIndex = params.step_no - 1;
+        if (updateIndex < 0 || updateIndex >= plan.steps.length) {
+          throw new Error(`步骤索引 ${params.step_no} 超出范围`);
+        }
+        const newDescription = (params.content as string[])[0];
+        const step = plan.steps[updateIndex];
+        step.description = newDescription.trim();
+        affectedIds.push(step.id);
+        break;
+      }
+
+      default:
+        throw new Error(`不支持的操作类型: ${op}`);
+    }
 
     const log: TaskLog = {
       timestamp,
       level: LogLevel.Info,
       category: LogCategory.Step,
       action: LogAction.Modify,
-      message: '计划步骤修改',
+      message: `步骤${operationType}操作`,
       ai_notes: params.reason,
       details: {
         field: 'steps',
         change_type: params.change_type,
         reason: params.reason,
+        operation: operationType,
         plan_id: params.plan_id,
         old_step_count: oldStepCount,
         new_step_count: plan.steps.length,
@@ -1991,18 +2157,13 @@ export class TaskManager {
     };
     task.logs.push(log);
 
-    // 如果是新添加步骤，设置第一个步骤为进行中
-    if (oldStepCount === 0 && plan.steps.length > 0) {
-      plan.steps[0].status = TaskStatus.InProgress;
-    }
-
     return {
       success: true,
       field: 'steps',
-      affected_ids: [params.plan_id!, ...plan.steps.map((s) => s.id)],
-      steps_added: plan.steps.length,
-      steps_replaced: oldStepCount > 0,
-      first_step_started: oldStepCount === 0 && plan.steps.length > 0,
+      affected_ids: affectedIds,
+      steps_added: stepsAdded,
+      steps_replaced: stepsReplaced,
+      first_step_started: firstStepStarted,
     };
   }
 
@@ -2011,10 +2172,12 @@ export class TaskManager {
     params: TaskModifyParams,
     timestamp: string
   ): Promise<TaskModifyResult> {
-    const newHints = params.content as string[];
+    const op = params.op || 'replace';
+    const newHints = (params.hints || params.content) as string[];
     let targetLevel: string;
     let affectedIds: string[] = [];
 
+    // 确定目标层级和获取现有 hints
     if (params.step_id && params.plan_id) {
       const plan = task.overall_plan.find((p) => p.id === params.plan_id);
       if (!plan) {
@@ -2026,21 +2189,66 @@ export class TaskManager {
         throw new Error('指定的步骤不存在');
       }
 
-      step.hints = [...newHints];
       targetLevel = 'step';
       affectedIds = [params.step_id];
+
+      // 执行操作
+      switch (op) {
+        case 'replace':
+          step.hints = [...newHints];
+          break;
+        case 'append':
+          step.hints.push(...newHints);
+          break;
+        case 'remove':
+          // 移除指定索引或所有匹配的提示
+          step.hints = step.hints.filter(h => !newHints.includes(h));
+          break;
+        default:
+          throw new Error(`步骤提示不支持操作: ${op}`);
+      }
     } else if (params.plan_id) {
       const plan = task.overall_plan.find((p) => p.id === params.plan_id);
       if (!plan) {
         throw new Error('指定的计划不存在');
       }
 
-      plan.hints = [...newHints];
       targetLevel = 'plan';
       affectedIds = [params.plan_id];
+
+      // 执行操作
+      switch (op) {
+        case 'replace':
+          plan.hints = [...newHints];
+          break;
+        case 'append':
+          if (!plan.hints) plan.hints = [];
+          plan.hints.push(...newHints);
+          break;
+        case 'remove':
+          plan.hints = (plan.hints || []).filter(h => !newHints.includes(h));
+          break;
+        default:
+          throw new Error(`计划提示不支持操作: ${op}`);
+      }
     } else {
-      task.task_hints = [...newHints];
       targetLevel = 'task';
+
+      // 执行操作
+      switch (op) {
+        case 'replace':
+          task.task_hints = [...newHints];
+          break;
+        case 'append':
+          if (!task.task_hints) task.task_hints = [];
+          task.task_hints.push(...newHints);
+          break;
+        case 'remove':
+          task.task_hints = (task.task_hints || []).filter(h => !newHints.includes(h));
+          break;
+        default:
+          throw new Error(`任务提示不支持操作: ${op}`);
+      }
     }
 
     const log: TaskLog = {
@@ -2048,12 +2256,13 @@ export class TaskManager {
       level: LogLevel.Info,
       category: LogCategory.Task,
       action: LogAction.Modify,
-      message: `${targetLevel}级提示修改`,
+      message: `${targetLevel}级提示${op}操作`,
       ai_notes: params.reason,
       details: {
         field: 'hints',
         change_type: params.change_type,
         reason: params.reason,
+        operation: op,
         target_level: targetLevel,
         plan_id: params.plan_id,
         step_id: params.step_id,
