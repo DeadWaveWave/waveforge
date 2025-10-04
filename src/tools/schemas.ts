@@ -209,7 +209,7 @@ export const CurrentTaskInitSchema = {
  */
 export const CurrentTaskUpdateSchema = {
   name: 'current_task_update',
-  description: '在计划和步骤两个层级更新任务进度，支持状态管理和自动推进',
+  description: '在计划和步骤两个层级更新任务进度，支持状态管理和自动推进。支持通过 plan_no/step_no 序号或 plan_id/step_id UUID 定位节点。',
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -221,11 +221,21 @@ export const CurrentTaskUpdateSchema = {
       },
       plan_id: {
         type: 'string' as const,
-        description: 'Plan级别更新时使用的计划ID',
+        description: 'Plan级别更新时使用的计划ID（可用plan_no代替）',
+      },
+      plan_no: {
+        type: 'integer' as const,
+        description: 'Plan级别更新时使用的计划序号（从1开始，可替代plan_id）',
+        minimum: 1,
       },
       step_id: {
         type: 'string' as const,
-        description: 'Step级别更新时使用的步骤ID',
+        description: 'Step级别更新时使用的步骤ID（可用step_no代替）',
+      },
+      step_no: {
+        type: 'integer' as const,
+        description: 'Step级别更新时使用的步骤序号（从1开始，可替代step_id）',
+        minimum: 1,
       },
       status: {
         type: 'string' as const,
@@ -299,7 +309,7 @@ export const CurrentTaskUpdateSchema = {
  */
 export const CurrentTaskReadSchema = {
   name: 'current_task_read',
-  description: '读取当前任务完整状态以恢复上下文，支持 EVR 相关参数和同步预览',
+  description: '读取当前任务完整状态以恢复上下文，支持 EVR 相关参数和同步预览。返回 task-level hints，不返回 plan/step hints（符合级别隔离原则）。',
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -351,7 +361,7 @@ export const CurrentTaskReadSchema = {
  */
 export const CurrentTaskModifySchema = {
   name: 'current_task_modify',
-  description: '动态修改任务结构，包括计划、步骤、目标和EVR内容，支持提示管理',
+  description: '动态修改任务结构，包括计划、步骤、目标和EVR内容，支持提示管理。支持 replace/append/insert/remove/update/add 操作，支持 plan_no/step_no 序号定位。',
   inputSchema: {
     type: 'object' as const,
     properties: {

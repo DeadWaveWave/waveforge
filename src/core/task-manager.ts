@@ -413,6 +413,14 @@ export class TaskManager {
   /**
    * 执行 Lazy 同步
    */
+  /**
+   * 执行 Lazy 同步并应用变更（公共接口）
+   * 供工具调用以触发透明同步
+   */
+  async performLazySyncAndApply(task: CurrentTask, projectId?: string): Promise<any | null> {
+    return this.performLazySync(task, projectId);
+  }
+
   private async performLazySync(task: CurrentTask, projectId?: string): Promise<any | null> {
     try {
       const panelPath = this.getCurrentTaskPanelPath();
@@ -607,8 +615,8 @@ export class TaskManager {
       task.updated_at = timestamp;
       await this.saveTask(task, params.project_id);
 
-      // 添加提示信息
-      result.hints = this.getActiveHints(task, params);
+      // 添加提示信息（update 上下文不返回 task hints）
+      result.hints = this.getActiveHints(task, params, 'update');
 
       // 添加同步预览信息（如果有变更）
       if (syncResult) {
@@ -1727,45 +1735,58 @@ export class TaskManager {
 
   /**
    * 获取当前上下文的活跃提示
+   *
+   * 隔离规则：
+   * - task hints: 只在 toolContext='read' 时返回（仅 current_task_read）
+   * - plan hints: 只在对应 plan 状态为 in_progress 时返回
+   * - step hints: 在 step 上下文中只返回 step-level hints，不包含 plan hints
    */
-  private getActiveHints(task: CurrentTask, params: TaskUpdateParams) {
+  private getActiveHints(
+    task: CurrentTask,
+    params: TaskUpdateParams,
+    toolContext?: 'read' | 'update' | 'modify'
+  ) {
     const hints = {
-      task: task.task_hints || [],
+      task: [] as string[],  // 默认为空，只在 read 时填充
       plan: [] as string[],
       step: [] as string[],
     };
 
-    let targetPlan: TaskPlan | undefined;
-
-    // 获取计划级提示
-    if (params.plan_id) {
-      targetPlan = task.overall_plan.find((p) => p.id === params.plan_id);
-      if (targetPlan) {
-        hints.plan = targetPlan.hints || [];
-      }
+    // 1. Task hints: 只在 current_task_read 时返回
+    if (toolContext === 'read') {
+      hints.task = task.task_hints || [];
     }
 
-    // 获取步骤级提示
+    let targetPlan: TaskPlan | undefined;
+
+    // 2. 如果在 step 上下文中，只返回 step hints，不返回 plan hints
     if (params.step_id) {
       for (const plan of task.overall_plan) {
         const step = plan.steps.find((s) => s.id === params.step_id);
         if (step) {
           hints.step = step.hints || [];
-          // 如果没有明确的 plan_id，从步骤所属的计划获取计划级提示
-          if (!targetPlan) {
-            targetPlan = plan;
-            hints.plan = plan.hints || [];
-          }
+          targetPlan = plan;  // 记录但不返回 plan hints
           break;
         }
+      }
+    }
+    // 3. Plan hints: 只在 plan 上下文且 plan 状态为 in_progress 时返回
+    else if (params.plan_id) {
+      targetPlan = task.overall_plan.find((p) => p.id === params.plan_id);
+      if (targetPlan && targetPlan.status === TaskStatus.InProgress) {
+        hints.plan = targetPlan.hints || [];
       }
     }
 
     // 记录调试信息
     logger.info(LogCategory.Task, LogAction.Handle, 'Active hints resolved', {
+      toolContext,
       taskHintsCount: hints.task?.length || 0,
       planHintsCount: hints.plan?.length || 0,
       stepHintsCount: hints.step?.length || 0,
+      stepContext: !!params.step_id,
+      planContext: !!params.plan_id,
+      planStatus: targetPlan?.status,
     });
 
     return hints;

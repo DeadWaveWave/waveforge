@@ -508,6 +508,7 @@ export class LazySync {
     if (!this.arraysEqual(parsedPanel.hints, structuredData.hints || [])) {
       const panelHasHints = Array.isArray(parsedPanel.hints) && parsedPanel.hints.length > 0;
       const structuredHasHints = Array.isArray(structuredData.hints) && structuredData.hints.length > 0;
+
       if (panelHasHints || !structuredHasHints) {
         changes.push({
           section: 'hints',

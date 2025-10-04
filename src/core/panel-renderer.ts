@@ -98,15 +98,18 @@ export class PanelRenderer {
       sections.push('');
     }
 
-    // 渲染提示
+    // 渲染提示（始终渲染，即使为空，方便用户手动添加）
+    sections.push('## Task Hints');
+    sections.push('');
     if (data.hints.length > 0) {
-      sections.push('## Task Hints');
-      sections.push('');
       data.hints.forEach((hint) => {
         sections.push(this.formatQuoteBlock(hint));
       });
-      sections.push('');
+    } else {
+      // 空的 hints section，用户可以手动添加
+      sections.push('<!-- 在此添加任务级别的提示，使用 > 引用格式 -->');
     }
+    sections.push('');
 
     // 渲染 EVR
     if (data.evrs.length > 0) {
@@ -180,9 +183,10 @@ export class PanelRenderer {
       const planNumber = index + 1;
       const checkbox = this.formatCheckboxState(plan.status);
 
-      // 渲染计划主行
+      // 渲染计划主行 - 不注入锚点，统一由 injectStableAnchors 处理
       let planLine = `${planNumber}. ${checkbox} ${plan.text}`;
-      if (this.options.injectAnchors && plan.anchor) {
+      // 如果计划已有稳定锚点(p-xxx格式)，则保留
+      if (plan.anchor && plan.anchor.startsWith('p-')) {
         planLine += ` <!-- plan:${plan.anchor} -->`;
       }
       lines.push(planLine);
@@ -213,7 +217,8 @@ export class PanelRenderer {
           const stepCheckbox = this.formatCheckboxState(step.status);
 
           let stepLine = `${this.options.indentString}${planNumber}.${stepNumber} ${stepCheckbox} ${step.text}`;
-          if (this.options.injectAnchors && step.anchor) {
+          // 如果步骤已有稳定锚点(s-xxx格式)，则保留
+          if (step.anchor && step.anchor.startsWith('s-')) {
             stepLine += ` <!-- step:${step.anchor} -->`;
           }
           lines.push(stepLine);
@@ -252,6 +257,7 @@ export class PanelRenderer {
 
   /**
    * 渲染 EVR 列表
+   * 使用标签化条目格式，符合设计文档规范
    */
   renderEVRs(evrs: ParsedEVR[]): string {
     const lines: string[] = [];
@@ -265,50 +271,64 @@ export class PanelRenderer {
       lines.push(evrLine);
       lines.push('');
 
-      // 渲染 verify 字段
+      // 渲染 verify 字段 - 使用标签化条目格式
       if (evr.verify) {
-        lines.push('**Verify:**');
         if (Array.isArray(evr.verify)) {
-          lines.push(this.renderArrayField(evr.verify));
+          // 数组格式：每个项目一行
+          evr.verify.forEach((item, idx) => {
+            if (idx === 0) {
+              lines.push(`- [verify] ${item}`);
+            } else {
+              lines.push(`- [verify] ${item}`);
+            }
+          });
         } else {
-          lines.push(evr.verify);
+          lines.push(`- [verify] ${evr.verify}`);
         }
-        lines.push('');
       }
 
-      // 渲染 expect 字段
+      // 渲染 expect 字段 - 使用标签化条目格式
       if (evr.expect) {
-        lines.push('**Expect:**');
         if (Array.isArray(evr.expect)) {
-          lines.push(this.renderArrayField(evr.expect));
+          // 数组格式：每个项目一行
+          evr.expect.forEach((item, idx) => {
+            if (idx === 0) {
+              lines.push(`- [expect] ${item}`);
+            } else {
+              lines.push(`- [expect] ${item}`);
+            }
+          });
         } else {
-          lines.push(evr.expect);
+          lines.push(`- [expect] ${evr.expect}`);
         }
-        lines.push('');
       }
 
-      // 渲染状态和元数据
-      lines.push(`- Status: ${evr.status}`);
+      // 渲染状态 - 使用标签化条目格式
+      lines.push(`- [status] ${evr.status}`);
 
+      // 渲染 class - 使用标签化条目格式
       if (evr.class) {
-        lines.push(`- Class: ${evr.class}`);
+        lines.push(`- [class] ${evr.class}`);
       }
 
+      // 渲染 last_run - 使用标签化条目格式
       if (evr.lastRun) {
-        lines.push(`- Last Run: ${evr.lastRun}`);
+        lines.push(`- [last_run] ${evr.lastRun}`);
       }
 
+      // 渲染 notes - 使用标签化条目格式
       if (evr.notes) {
-        lines.push(`- Notes: ${evr.notes}`);
+        lines.push(`- [notes] ${evr.notes}`);
       }
 
+      // 渲染 proof - 使用标签化条目格式
       if (evr.proof) {
-        lines.push(`- Proof: ${evr.proof}`);
+        lines.push(`- [proof] ${evr.proof}`);
       }
 
       lines.push('');
 
-      // 渲染验证运行记录
+      // 渲染验证运行记录（保持不变）
       if (evr.runs && evr.runs.length > 0) {
         lines.push('**Verification Runs:**');
         evr.runs.forEach((run) => {

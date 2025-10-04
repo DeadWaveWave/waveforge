@@ -206,12 +206,44 @@ export class CurrentTaskUpdateTool extends BaseTaskTool {
       // 参数验证
       this.validateParams('current_task_update', params);
 
+      // 参数转换：plan_no → plan_id, step_no → step_id
+      if (params.update_type === 'plan' && params.plan_no && !params.plan_id) {
+        const task = await this.taskManager.getCurrentTask(params.project_id);
+        if (!task) {
+          throw new NotFoundError('当前没有活跃任务');
+        }
+        const planIndex = params.plan_no - 1;
+        if (planIndex < 0 || planIndex >= task.overall_plan.length) {
+          throw new ValidationError(`无效的 plan_no: ${params.plan_no}`);
+        }
+        params.plan_id = task.overall_plan[planIndex].id;
+      }
+
+      if (params.update_type === 'step' && params.step_no && !params.step_id) {
+        const task = await this.taskManager.getCurrentTask(params.project_id);
+        if (!task) {
+          throw new NotFoundError('当前没有活跃任务');
+        }
+        // 找到对应的步骤
+        let found = false;
+        for (const plan of task.overall_plan) {
+          if (plan.steps && plan.steps.length >= params.step_no) {
+            params.step_id = plan.steps[params.step_no - 1].id;
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          throw new ValidationError(`无效的 step_no: ${params.step_no}`);
+        }
+      }
+
       // 验证条件逻辑
       if (params.update_type === 'plan' && !params.plan_id) {
-        throw new ValidationError('plan级别更新需要提供plan_id');
+        throw new ValidationError('plan级别更新需要提供plan_id或plan_no');
       }
       if (params.update_type === 'step' && !params.step_id) {
-        throw new ValidationError('step级别更新需要提供step_id');
+        throw new ValidationError('step级别更新需要提供step_id或step_no');
       }
       if (params.update_type === 'evr' && !params.evr) {
         throw new ValidationError('EVR更新需要提供evr字段');
@@ -265,6 +297,7 @@ export class CurrentTaskUpdateTool extends BaseTaskTool {
       }
 
       return this.createSuccessResponse({
+        success: true,
         current_plan_id: result.current_plan_id,
         next_step: result.next_step,
         auto_advanced: result.auto_advanced,
@@ -347,6 +380,12 @@ export class CurrentTaskReadTool extends BaseTaskTool {
         throw new NotFoundError('当前没有活跃任务');
       }
 
+      // 执行 Lazy 同步并应用变更（透明同步）
+      const syncResult = await this.taskManager.performLazySyncAndApply(
+        task,
+        params.project_id
+      );
+
       // 构建响应数据
       const responseData: any = {
         task: this.processTaskData(task, params),
@@ -368,14 +407,24 @@ export class CurrentTaskReadTool extends BaseTaskTool {
         responseData.evr_details = [];
       }
 
-      // 检测面板同步状态（仅干运行预览）
-      const syncInfo = await this.checkPanelSync(task);
-      if (syncInfo.hasPendingChanges) {
-        responseData.panel_pending = true;
-        responseData.sync_preview = syncInfo.preview;
+      // 添加同步预览信息（如果有变更被应用）
+      if (syncResult && syncResult.changes.length > 0) {
+        responseData.panel_pending = false;
+        responseData.sync_preview = {
+          applied: true,
+          changes: syncResult.changes.map((change: any) => ({
+            type: 'content' as const,
+            section: change.section,
+            field: change.field,
+            oldValue: change.oldValue,
+            newValue: change.newValue,
+            source: change.source,
+          })),
+          conflicts: syncResult.conflicts || [],
+          affectedSections: [...new Set(syncResult.changes.map((c: any) => c.section))],
+        };
       } else {
         responseData.panel_pending = false;
-        // 不返回 sync_preview 字段以避免噪声
       }
 
       // 添加日志高亮和计数
@@ -386,6 +435,9 @@ export class CurrentTaskReadTool extends BaseTaskTool {
       // 添加缓存信息
       responseData.md_version = this.generateMdVersion(task);
 
+      // 添加 hints 信息（read 上下文会返回 task hints）
+      responseData.hints = this.getActiveHints(task);
+
       this.logOperation(
         LogCategory.Task,
         LogAction.Handle,
@@ -393,8 +445,9 @@ export class CurrentTaskReadTool extends BaseTaskTool {
         {
           taskId: task.id,
           evrReady: responseData.evr_ready,
-          panelPending: responseData.panel_pending,
+          syncApplied: syncResult ? syncResult.changes.length : 0,
           logsHighlights: responseData.logs_highlights.length,
+          taskHintsCount: responseData.hints?.task?.length || 0,
         }
       );
 
@@ -644,6 +697,22 @@ export class CurrentTaskReadTool extends BaseTaskTool {
     return Buffer.from(JSON.stringify(versionData))
       .toString('base64')
       .slice(0, 16);
+  }
+
+  /**
+   * 获取 current_task_read 的 hints
+   * 只返回 task-level hints（符合隔离规则）
+   */
+  private getActiveHints(task: any): {
+    task: string[];
+    plan: string[];
+    step: string[];
+  } {
+    return {
+      task: task.task_hints || [],
+      plan: [],  // read 上下文不返回 plan hints
+      step: [],  // read 上下文不返回 step hints
+    };
   }
 
   /**

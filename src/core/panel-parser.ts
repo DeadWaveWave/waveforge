@@ -313,6 +313,39 @@ export class PanelParser {
       if (!currentEVR) continue;
 
       // 解析 EVR 字段
+      // 支持标签化条目格式: - [verify] xxx, - [expect] xxx
+      const taggedItemMatch = trimmedLine.match(/^-\s*\[([^\]]+)\]\s*(.*)$/);
+      if (taggedItemMatch) {
+        const [, tag, content] = taggedItemMatch;
+        const tagLower = tag.toLowerCase();
+
+        if (tagLower === 'verify' || tagLower === '验证') {
+          this.finalizeEVRField(currentEVR, currentField, fieldContent);
+          currentField = 'verify';
+          fieldContent = [];
+          if (content) fieldContent.push(content);
+        } else if (tagLower === 'expect' || tagLower === '预期') {
+          this.finalizeEVRField(currentEVR, currentField, fieldContent);
+          currentField = 'expect';
+          fieldContent = [];
+          if (content) fieldContent.push(content);
+        } else if (tagLower === 'status' || tagLower === '状态') {
+          this.finalizeEVRField(currentEVR, currentField, fieldContent);
+          currentField = null;
+          currentEVR.status = this.parseEVRStatus(content);
+        } else if (tagLower === 'class' || tagLower === '类别') {
+          currentEVR.class = this.parseEVRClass(content);
+        } else if (tagLower === 'last_run' || tagLower === 'lastrun' || tagLower === '最后运行') {
+          currentEVR.lastRun = content;
+        } else if (tagLower === 'notes' || tagLower === '备注') {
+          currentEVR.notes = content;
+        } else if (tagLower === 'proof' || tagLower === '证据') {
+          currentEVR.proof = content;
+        }
+        continue;
+      }
+
+      // 向后兼容旧格式
       if (
         trimmedLine.startsWith('**Verify:**') ||
         trimmedLine.startsWith('**verify:**') ||
@@ -421,11 +454,21 @@ export class PanelParser {
 
     for (const line of hintLines) {
       const trimmedLine = line.trim();
+
+      // 跳过空行和 HTML 注释
+      if (!trimmedLine || trimmedLine.startsWith('<!--')) {
+        continue;
+      }
+
       if (trimmedLine.startsWith('>')) {
-        hints.push(trimmedLine.substring(1).trim());
+        const content = trimmedLine.substring(1).trim();
+        // 再次检查提取的内容不是 HTML 注释
+        if (content && !content.startsWith('<!--')) {
+          hints.push(content);
+        }
       } else if (trimmedLine.startsWith('-') || trimmedLine.startsWith('*')) {
         hints.push(trimmedLine.replace(/^[-*]\s*/, ''));
-      } else if (trimmedLine) {
+      } else {
         hints.push(trimmedLine);
       }
     }
