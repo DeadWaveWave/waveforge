@@ -134,15 +134,14 @@ export class PanelRenderer {
       sections.push(this.renderLogs(data.logs));
     }
 
-    let body = sections.join('\n');
+    const body = sections.join('\n');
 
-    // 注入稳定锚点
-    if (this.options.injectAnchors) {
-      body = this.injectStableAnchors(body);
-    }
+    // 注意：由于 renderPlans() 和 renderEVRs() 已经在渲染时直接添加了锚点，
+    // 这里不再需要调用 injectStableAnchors()，避免产生双重锚点
+    // 如果需要为用户手动添加的内容（没有锚点）自动注入锚点，应该在 LazySync 解析阶段处理
 
     // 可选：注入 Front Matter（md_version / last_modified）
-    let result = body;
+    let finalResult = body;
     if (this.options.includeFrontMatter) {
       const mdVersion = this.computeMdVersion(body);
       const lastModified = new Date().toISOString();
@@ -153,7 +152,7 @@ export class PanelRenderer {
         '---',
         '',
       ].join('\n');
-      result = fm + body;
+      finalResult = fm + body;
     }
 
     logger.info(LogCategory.Task, LogAction.Create, '面板渲染完成', {
@@ -163,7 +162,7 @@ export class PanelRenderer {
       rendererVersion: this.options.rendererVersion,
     });
 
-    return result;
+    return finalResult;
   }
 
   /**
@@ -183,12 +182,9 @@ export class PanelRenderer {
       const planNumber = index + 1;
       const checkbox = this.formatCheckboxState(plan.status);
 
-      // 渲染计划主行 - 不注入锚点，统一由 injectStableAnchors 处理
-      let planLine = `${planNumber}. ${checkbox} ${plan.text}`;
-      // 如果计划已有稳定锚点(p-xxx格式)，则保留
-      if (plan.anchor && plan.anchor.startsWith('p-')) {
-        planLine += ` <!-- plan:${plan.anchor} -->`;
-      }
+      // 渲染计划主行，始终使用 plan.id 作为锚点
+      // 这样确保 Panel 和 JSON 的 ID 一致，支持双向同步
+      const planLine = `${planNumber}. ${checkbox} ${plan.text} <!-- plan:${plan.id} -->`;
       lines.push(planLine);
 
       // 渲染计划级提示
@@ -216,11 +212,8 @@ export class PanelRenderer {
           const stepNumber = stepIndex + 1;
           const stepCheckbox = this.formatCheckboxState(step.status);
 
-          let stepLine = `${this.options.indentString}${planNumber}.${stepNumber} ${stepCheckbox} ${step.text}`;
-          // 如果步骤已有稳定锚点(s-xxx格式)，则保留
-          if (step.anchor && step.anchor.startsWith('s-')) {
-            stepLine += ` <!-- step:${step.anchor} -->`;
-          }
+          // 始终使用 step.id 作为锚点
+          const stepLine = `${this.options.indentString}${planNumber}.${stepNumber} ${stepCheckbox} ${step.text} <!-- step:${step.id} -->`;
           lines.push(stepLine);
 
           // 渲染步骤级提示
@@ -263,10 +256,12 @@ export class PanelRenderer {
     const lines: string[] = [];
 
     evrs.forEach((evr, index) => {
-      // 渲染 EVR 标题行
+      // 渲染 EVR 标题行，使用稳定锚点（evr.id 或 evr.anchor）
+      // 注意：不要在这里注入锚点，因为 injectStableAnchors 会处理
+      const anchorId = evr.anchor || evr.id;
       let evrLine = `### ${evr.title}`;
-      if (this.options.injectAnchors && evr.anchor) {
-        evrLine += ` <!-- ${evr.anchor} -->`;
+      if (anchorId) {
+        evrLine += ` <!-- evr:${anchorId} -->`;
       }
       lines.push(evrLine);
       lines.push('');
@@ -491,25 +486,40 @@ export class PanelRenderer {
     let result = content;
 
     // 为没有锚点的计划行注入锚点
+    // 注意：检查是否已经包含 plan: 锚点，避免重复注入
     result = result.replace(
       /^(\d+\.\s+\[[\s\-x!]\]\s+[^\n]+)(?!\s*<!--)/gm,
       (match) => {
+        // 检查是否已经包含 plan: 锚点
+        if (match.includes('<!-- plan:')) {
+          return match;
+        }
         const planId = this.generatePlanId();
         return `${match} <!-- plan:${planId} -->`;
       }
     );
 
     // 为没有锚点的步骤行注入锚点
+    // 注意：检查是否已经包含 step: 锚点，避免重复注入
     result = result.replace(
       /^(\s+\d+\.\d+\s+\[[\s\-x!]\]\s+[^\n]+)(?!\s*<!--)/gm,
       (match) => {
+        // 检查是否已经包含 step: 锚点
+        if (match.includes('<!-- step:')) {
+          return match;
+        }
         const stepId = this.generateStepId();
         return `${match} <!-- step:${stepId} -->`;
       }
     );
 
     // 为没有锚点的 EVR 标题注入锚点
+    // 注意：这里要检查是否已经有 evr: 锚点，避免重复注入
     result = result.replace(/^(###\s+[^\n]+)(?!\s*<!--)/gm, (match) => {
+      // 检查是否已经包含 EVR 锚点
+      if (match.includes('<!-- evr:')) {
+        return match;
+      }
       const evrId = this.generateEVRId();
       return `${match} <!-- evr:${evrId} -->`;
     });

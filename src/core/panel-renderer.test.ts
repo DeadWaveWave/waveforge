@@ -285,11 +285,9 @@ describe('PanelRenderer', () => {
 
       const result = renderer.renderEVRs(evrs);
       expect(result).toContain('### 测试 EVR');
-      expect(result).toContain('**Verify:**');
-      expect(result).toContain('运行测试命令');
-      expect(result).toContain('**Expect:**');
-      expect(result).toContain('所有测试通过');
-      expect(result).toContain('- Status: unknown');
+      expect(result).toContain('- [verify] 运行测试命令');
+      expect(result).toContain('- [expect] 所有测试通过');
+      expect(result).toContain('- [status] unknown');
     });
 
     it('应该渲染数组形式的 verify 和 expect', () => {
@@ -305,11 +303,10 @@ describe('PanelRenderer', () => {
       ];
 
       const result = renderer.renderEVRs(evrs);
-      expect(result).toContain('步骤1');
-      expect(result).toContain('<details>');
-      expect(result).toContain('<summary>More items...</summary>');
-      expect(result).toContain('步骤2');
-      expect(result).toContain('步骤3');
+      expect(result).toContain('- [verify] 步骤1');
+      expect(result).toContain('- [verify] 步骤2');
+      expect(result).toContain('- [verify] 步骤3');
+      expect(result).toContain('- [expect] 结果1');
     });
 
     it('应该正确处理单个项目的数组', () => {
@@ -345,8 +342,10 @@ describe('PanelRenderer', () => {
       ];
 
       const result = renderer.renderEVRs(evrs);
-      expect(result).toContain('步骤1\n步骤2\n步骤3');
-      expect(result).toContain('结果1\n结果2\n结果3');
+      expect(result).toContain('- [verify] 步骤1');
+      expect(result).toContain('- [verify] 步骤2');
+      expect(result).toContain('- [verify] 步骤3');
+      expect(result).toContain('- [expect] 结果1');
       expect(result).not.toContain('<details>');
     });
 
@@ -367,11 +366,11 @@ describe('PanelRenderer', () => {
       ];
 
       const result = renderer.renderEVRs(evrs);
-      expect(result).toContain('- Status: pass');
-      expect(result).toContain('- Class: static');
-      expect(result).toContain('- Last Run: 2023-12-01T10:00:00Z');
-      expect(result).toContain('- Notes: 重要备注');
-      expect(result).toContain('- Proof: https://example.com/proof');
+      expect(result).toContain('- [status] pass');
+      expect(result).toContain('- [class] static');
+      expect(result).toContain('- [last_run] 2023-12-01T10:00:00Z');
+      expect(result).toContain('- [notes] 重要备注');
+      expect(result).toContain('- [proof] https://example.com/proof');
     });
 
     it('应该渲染验证运行记录', () => {
@@ -711,16 +710,16 @@ describe('PanelRenderer', () => {
       // 验证标题格式
       expect(result).toContain('### 标准 EVR');
 
-      // 验证字段格式
-      expect(result).toContain('**Verify:**');
-      expect(result).toContain('**Expect:**');
+      // 验证字段格式 - 使用标签化条目格式
+      expect(result).toContain('- [verify] verify content');
+      expect(result).toContain('- [expect] expect content');
 
-      // 验证元数据格式
-      expect(result).toContain('- Status: pass');
-      expect(result).toContain('- Class: runtime');
-      expect(result).toContain('- Last Run: 2023-12-01T10:00:00Z');
-      expect(result).toContain('- Notes: test notes');
-      expect(result).toContain('- Proof: proof link');
+      // 验证元数据格式 - 使用标签化条目格式
+      expect(result).toContain('- [status] pass');
+      expect(result).toContain('- [class] runtime');
+      expect(result).toContain('- [last_run] 2023-12-01T10:00:00Z');
+      expect(result).toContain('- [notes] test notes');
+      expect(result).toContain('- [proof] proof link');
 
       // 验证运行记录格式
       expect(result).toContain('**Verification Runs:**');

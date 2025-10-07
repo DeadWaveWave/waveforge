@@ -167,6 +167,15 @@ export class LazySync {
   detectDifferences(panelContent: string, structuredData: TaskData): SyncDiff {
     const timer = logger.createTimer('sync-detect-differences');
 
+    // Debug: 记录面板内容的计划部分
+    const planSection = panelContent.match(/## Plans & Steps[\s\S]*?(?=\n##|$)/)?.[0];
+    if (planSection) {
+      const planLines = planSection.split('\n').slice(0, 10);
+      logger.info(LogCategory.Task, LogAction.Handle, 'LazySync: 面板内容（计划部分前10行）', {
+        lines: planLines,
+      });
+    }
+
     try {
       // 解析面板内容
       const parsedPanel = this.parser.parseMarkdown(panelContent);
@@ -726,6 +735,12 @@ export class LazySync {
     structuredData: TaskData,
     changes: ContentChange[]
   ): void {
+    // Debug: 记录ID匹配情况
+    logger.info(LogCategory.Task, LogAction.Handle, 'Plan ID匹配调试', {
+      parsedIds: parsedPanel.plans.map(p => ({ id: p.id, text: p.text.substring(0, 30) })),
+      structuredIds: (structuredData.plans || []).map(p => ({ id: p.id, desc: p.description?.substring(0, 30) })),
+    });
+
     for (const parsedPlan of parsedPanel.plans) {
       const structuredPlan = structuredData.plans?.find(
         (p) => p.id === parsedPlan.id
@@ -734,6 +749,12 @@ export class LazySync {
       if (structuredPlan) {
         // 检测计划描述变更
         if (parsedPlan.text !== structuredPlan.description) {
+          logger.info(LogCategory.Task, LogAction.Handle, '检测到计划文本变更', {
+            planId: parsedPlan.id,
+            matched: true,
+            oldValue: structuredPlan.description,
+            newValue: parsedPlan.text,
+          });
           changes.push({
             section: parsedPlan.id, // 使用 plan-1 而不是 plan:plan-1
             field: 'description',
@@ -820,6 +841,31 @@ export class LazySync {
             source: 'panel',
           });
         }
+      } else {
+        // 新增的步骤
+        changes.push({
+          section: `plan:${parsedPlan.id}`,
+          field: 'new_step',
+          oldValue: null,
+          newValue: parsedStep,
+          source: 'panel',
+        });
+      }
+    }
+
+    // 检测删除的步骤
+    for (const structuredStep of structuredPlan.steps || []) {
+      const parsedStep = parsedPlan.steps.find(
+        (s: any) => s.id === structuredStep.id
+      );
+      if (!parsedStep) {
+        changes.push({
+          section: `plan:${parsedPlan.id}`,
+          field: 'deleted_step',
+          oldValue: structuredStep,
+          newValue: null,
+          source: 'panel',
+        });
       }
     }
   }

@@ -1337,23 +1337,56 @@ export class PanelParser {
       finalNumberPath = bestMatch.numberPath.path;
     }
 
+    // Debug: 记录 ID 生成过程
+    if (process.env.NODE_ENV !== 'production') {
+      logger.info(LogCategory.Task, LogAction.Handle, 'Plan ID生成调试', {
+        line: checkboxMatch.text.substring(0, 50),
+        anchorMatch: anchorMatch ? anchorMatch[1] : null,
+        bestMatchAnchor: bestMatch.anchor?.id,
+        numberPath,
+        bestMatchNumberPath: bestMatch.numberPath?.path,
+      });
+    }
+
     if (anchorMatch) {
       // 直接使用行内锚点
       id = anchorMatch[1];
       finalAnchor = anchorMatch[1];
+      logger.info(LogCategory.Task, LogAction.Handle, 'Plan ID: 使用行内锚点', {
+        id,
+        line: checkboxMatch.text.substring(0, 50),
+      });
     } else if (bestMatch.anchor) {
       // 使用最佳匹配的锚点
       id = bestMatch.anchor.id;
       finalAnchor = bestMatch.anchor.id;
+      logger.info(LogCategory.Task, LogAction.Handle, 'Plan ID: 使用最佳匹配锚点', {
+        id,
+        line: checkboxMatch.text.substring(0, 50),
+      });
     } else if (numberPath) {
       // 使用行内序号路径
       id = `plan-${numberPath}`;
+      logger.info(LogCategory.Task, LogAction.Handle, 'Plan ID: 使用行内序号路径', {
+        id,
+        numberPath,
+        line: checkboxMatch.text.substring(0, 50),
+      });
     } else if (bestMatch.numberPath) {
       // 使用最佳匹配的序号路径
       id = `plan-${bestMatch.numberPath.path}`;
+      logger.info(LogCategory.Task, LogAction.Handle, 'Plan ID: 使用最佳匹配序号路径', {
+        id,
+        path: bestMatch.numberPath.path,
+        line: checkboxMatch.text.substring(0, 50),
+      });
     } else {
       // 最后回退到生成 ID
       id = this.generateStableId('plan', undefined, undefined, lineNumber);
+      logger.info(LogCategory.Task, LogAction.Handle, 'Plan ID: 生成新ID', {
+        id,
+        line: checkboxMatch.text.substring(0, 50),
+      });
     }
 
     const text = checkboxMatch.text.replace(/<!--.*?-->/g, '').trim();

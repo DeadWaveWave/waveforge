@@ -248,8 +248,10 @@ export class CurrentTaskUpdateTool extends BaseTaskTool {
       if (params.update_type === 'evr' && !params.evr) {
         throw new ValidationError('EVR更新需要提供evr字段');
       }
-      if (['completed', 'blocked'].includes(params.status) && !params.notes) {
-        throw new ValidationError('完成或阻塞状态需要提供notes说明');
+      // 只有 blocked 状态必须提供 notes 说明阻塞原因
+      // completed 状态的 notes 是可选的
+      if (params.status === 'blocked' && !params.notes) {
+        throw new ValidationError('阻塞状态需要提供notes说明阻塞原因');
       }
 
       this.logOperation(

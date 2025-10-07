@@ -539,6 +539,11 @@ export class TaskManager {
    * 将内容变更应用到任务数据
    */
   private applyContentChangesToTask(task: CurrentTask, changes: any[]): void {
+    logger.info(LogCategory.Task, LogAction.Handle, '开始应用内容变更', {
+      totalChanges: changes.length,
+      changes: changes.map(c => ({ section: c.section, field: c.field })),
+    });
+
     for (const change of changes) {
       try {
         // 根据变更类型应用到任务数据
@@ -553,14 +558,74 @@ export class TaskManager {
           } else if (typeof change.newValue === 'string') {
             task.goal = change.newValue;
           }
-        } else if (change.section.startsWith('plan-')) {
+        } else if (change.section.startsWith('plan-') || change.section.startsWith('p-')) {
           const planId = change.section;
           const plan = task.overall_plan.find(p => p.id === planId);
-          if (plan && change.field === 'description') {
-            plan.description = change.newValue;
-            plan.text = change.newValue; // 同时更新 text 别名
+          if (plan) {
+            if (change.field === 'description') {
+              plan.description = change.newValue;
+              plan.text = change.newValue; // 同时更新 text 别名
+            } else if (change.field === 'hints') {
+              // 应用计划级提示变更
+              const newHints = Array.isArray(change.newValue) ? change.newValue : [];
+              plan.hints = newHints;
+              logger.info(LogCategory.Task, LogAction.Handle, '应用计划级提示变更', {
+                planId: plan.id,
+                oldHints: change.oldValue,
+                newHints,
+              });
+            }
           }
-        } else if (change.section.startsWith('evr-')) {
+        } else if (change.section.startsWith('plan:') && change.field === 'new_step') {
+          // 处理新增步骤
+          const planId = change.section.substring(5); // 去掉 'plan:' 前缀
+          const plan = task.overall_plan.find(p => p.id === planId);
+          if (plan && change.newValue) {
+            // 初始化 steps 数组（如果不存在）
+            if (!plan.steps) {
+              plan.steps = [];
+            }
+            // 添加新步骤
+            const newStep: TaskStep = {
+              id: change.newValue.id,
+              description: change.newValue.text,
+              status: TaskStatus.ToDo,
+              hints: change.newValue.hints || [],
+              usesEVR: change.newValue.usesEVR || [],
+              contextTags: change.newValue.contextTags || [],
+              created_at: new Date().toISOString(),
+            };
+            plan.steps.push(newStep);
+            logger.info(LogCategory.Task, LogAction.Handle, '应用新增步骤', {
+              planId: plan.id,
+              stepId: newStep.id,
+              stepDescription: newStep.description,
+              totalSteps: plan.steps.length,
+            });
+          }
+        } else if (change.section.startsWith('plan:') && change.field === 'deleted_step') {
+          // 处理删除步骤
+          const planId = change.section.substring(5);
+          const plan = task.overall_plan.find(p => p.id === planId);
+          if (plan && change.oldValue) {
+            const stepId = change.oldValue.id;
+            plan.steps = (plan.steps || []).filter(s => s.id !== stepId);
+          }
+        } else if (change.section.startsWith('step:')) {
+          // 处理步骤内容变更
+          const stepId = change.section.substring(5);
+          for (const plan of task.overall_plan) {
+            const step = plan.steps?.find(s => s.id === stepId);
+            if (step) {
+              if (change.field === 'description') {
+                step.description = change.newValue;
+              } else if (change.field === 'hints') {
+                step.hints = Array.isArray(change.newValue) ? change.newValue : [];
+              }
+              break;
+            }
+          }
+        } else if (change.section.startsWith('evr:') || change.section.startsWith('evr-')) {
           const evrId = change.section;
           const evr = task.expectedResults?.find(e => e.id === evrId);
           if (evr) {
@@ -1271,11 +1336,13 @@ export class TaskManager {
       throw new Error('步骤级更新必须提供step_id');
     }
 
+    // 只有 blocked 状态必须提供 notes 说明阻塞原因
+    // completed 状态的 notes 是可选的
     if (
-      params.status === TaskStatus.Completed &&
+      params.status === TaskStatus.Blocked &&
       (!params.notes || params.notes.trim() === '')
     ) {
-      throw new Error('完成状态必须提供备注');
+      throw new Error('阻塞状态必须提供备注说明原因');
     }
   }
 
