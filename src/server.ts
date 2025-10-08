@@ -39,6 +39,8 @@ import {
 } from './tools/handshake-tools.js';
 import { ulid } from 'ulid';
 import * as path from 'path';
+import { realpathSync } from 'fs';
+import { fileURLToPath } from 'url';
 
 /**
  * WaveForge MCP 服务器类
@@ -1060,9 +1062,25 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 // 启动主函数
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    console.error('[WaveForge] 主函数执行失败:', error);
-    process.exit(1);
-  });
-}
+// 说明：当通过 npx 或全局 bin 符号链接启动时，process.argv[1] 可能与实际脚本不同。
+// 使用 realpath 同步规范化路径进行对比，避免主程序不运行。
+(() => {
+  try {
+    const metaPath = realpathSync(fileURLToPath(import.meta.url));
+    const argv1 = process.argv[1];
+    const argvPath = argv1 ? realpathSync(argv1) : '';
+    if (metaPath === argvPath) {
+      void main().catch((error) => {
+        console.error('[WaveForge] 主函数执行失败:', error);
+        process.exit(1);
+      });
+    }
+  } catch (_e) {
+    if (import.meta.url === `file://${process.argv[1]}`) {
+      void main().catch((error) => {
+        console.error('[WaveForge] 主函数执行失败:', error);
+        process.exit(1);
+      });
+    }
+  }
+})();
