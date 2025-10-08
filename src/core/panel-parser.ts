@@ -285,8 +285,9 @@ export class PanelParser {
       if (!trimmedLine) continue;
 
       // 检查是否是新的 EVR 开始
+      // 格式：1. [ ] EVR 标题 <!-- evr:evr-id -->
       const evrMatch = trimmedLine.match(
-        /^###\s+(.+?)(?:\s+<!-- evr:(.+?) -->)?$/
+        /^\d+\.\s*\[([x!\- ])\]\s+(.+?)(?:\s+<!-- evr:(.+?) -->)?$/
       );
       if (evrMatch) {
         // 保存前一个 EVR
@@ -296,14 +297,17 @@ export class PanelParser {
         }
 
         // 创建新的 EVR
+        const [, checkboxChar, title, anchor] = evrMatch;
+        const evrStatus = this.parseEVRStatusFromCheckbox(checkboxChar);
+
         currentEVR = {
-          id: evrMatch[2] || `evr-${ulid()}`,
-          title: evrMatch[1],
+          id: anchor || `evr-${ulid()}`,
+          title,
           verify: '',
           expect: '',
-          status: EVRStatus.Unknown,
+          status: evrStatus,
           runs: [],
-          anchor: evrMatch[2],
+          anchor,
         };
         currentField = null;
         fieldContent = [];
@@ -312,8 +316,7 @@ export class PanelParser {
 
       if (!currentEVR) continue;
 
-      // 解析 EVR 字段
-      // 支持标签化条目格式: - [verify] xxx, - [expect] xxx
+      // 解析 EVR 字段 - 只支持标签化条目格式
       const taggedItemMatch = trimmedLine.match(/^-\s*\[([^\]]+)\]\s*(.*)$/);
       if (taggedItemMatch) {
         const [, tag, content] = taggedItemMatch;
@@ -345,93 +348,8 @@ export class PanelParser {
         continue;
       }
 
-      // 向后兼容旧格式
-      if (
-        trimmedLine.startsWith('**Verify:**') ||
-        trimmedLine.startsWith('**verify:**') ||
-        trimmedLine.startsWith('**验证:**')
-      ) {
-        this.finalizeEVRField(currentEVR, currentField, fieldContent);
-        currentField = 'verify';
-        fieldContent = [];
-        const content = trimmedLine.replace(
-          /^\*\*(Verify|verify|验证):\*\*\s*/,
-          ''
-        );
-        if (content) fieldContent.push(content);
-      } else if (
-        trimmedLine.startsWith('**Expect:**') ||
-        trimmedLine.startsWith('**expect:**') ||
-        trimmedLine.startsWith('**预期:**')
-      ) {
-        this.finalizeEVRField(currentEVR, currentField, fieldContent);
-        currentField = 'expect';
-        fieldContent = [];
-        const content = trimmedLine.replace(
-          /^\*\*(Expect|expect|预期):\*\*\s*/,
-          ''
-        );
-        if (content) fieldContent.push(content);
-      } else if (
-        trimmedLine.startsWith('- Status:') ||
-        trimmedLine.startsWith('**status:**') ||
-        trimmedLine.startsWith('**状态:**')
-      ) {
-        this.finalizeEVRField(currentEVR, currentField, fieldContent);
-        currentField = null;
-        const statusText = trimmedLine.replace(
-          /^(-\s*Status:\s*|\*\*(status|状态):\*\*\s*)/,
-          ''
-        );
-        currentEVR.status = this.parseEVRStatus(statusText);
-      } else if (
-        trimmedLine.startsWith('- Class:') ||
-        trimmedLine.startsWith('**class:**') ||
-        trimmedLine.startsWith('**类别:**')
-      ) {
-        const classText = trimmedLine.replace(
-          /^(-\s*Class:\s*|\*\*(class|类别):\*\*\s*)/,
-          ''
-        );
-        currentEVR.class = this.parseEVRClass(classText);
-      } else if (
-        trimmedLine.startsWith('- Notes:') ||
-        trimmedLine.startsWith('**notes:**') ||
-        trimmedLine.startsWith('**备注:**')
-      ) {
-        const notes = trimmedLine.replace(
-          /^(-\s*Notes:\s*|\*\*(notes|备注):\*\*\s*)/,
-          ''
-        );
-        currentEVR.notes = notes;
-      } else if (
-        trimmedLine.startsWith('- Proof:') ||
-        trimmedLine.startsWith('**proof:**') ||
-        trimmedLine.startsWith('**证据:**')
-      ) {
-        const proof = trimmedLine.replace(
-          /^(-\s*Proof:\s*|\*\*(proof|证据):\*\*\s*)/,
-          ''
-        );
-        currentEVR.proof = proof;
-      } else if (
-        trimmedLine.startsWith('- Last Run:') ||
-        trimmedLine.startsWith('**lastRun:**') ||
-        trimmedLine.startsWith('**最后运行:**')
-      ) {
-        const lastRun = trimmedLine.replace(
-          /^(-\s*Last Run:\s*|\*\*(lastRun|最后运行):\*\*\s*)/,
-          ''
-        );
-        currentEVR.lastRun = lastRun;
-      } else if (
-        currentField &&
-        (trimmedLine.startsWith('-') || trimmedLine.startsWith('*'))
-      ) {
-        // 多行字段内容
-        fieldContent.push(trimmedLine.replace(/^[-*]\s*/, ''));
-      } else if (currentField) {
-        // 继续当前字段的内容
+      // 继续当前字段的多行内容
+      if (currentField) {
         fieldContent.push(trimmedLine);
       }
     }
@@ -1038,56 +956,7 @@ export class PanelParser {
         );
       }
 
-      // 检查 EVR 标题是否缺少锚点 - 只在明确的EVR区域内生成
-      // 更保守的策略：只为包含特定关键词的标题生成EVR锚点
-      if (trimmedLine.match(/^##\s+.+/) && !line.includes('<!-- evr:')) {
-        const title = trimmedLine.replace(/^##\s+/, '');
-        const lowerTitle = title.toLowerCase();
-
-        // 只为明确的EVR相关标题生成锚点
-        if (
-          lowerTitle.includes('evr') ||
-          lowerTitle.includes('预期结果') ||
-          lowerTitle.includes('验证') ||
-          lowerTitle.includes('测试') ||
-          (lowerTitle.match(/^[a-z]+-\d+/) && lowerTitle.includes('-'))
-        ) {
-          // 匹配 EVR-001 这样的格式
-
-          // 对于EVR标题，尝试提取现有的ID格式
-          let evrId: string;
-          const evrMatch = title.match(/^EVR[- ]?(\d+)/i);
-          if (evrMatch) {
-            evrId = `evr-${evrMatch[1].padStart(3, '0')}`;
-          } else {
-            evrId = `evr-${title
-              .toLowerCase()
-              .replace(/[^a-z0-9\u4e00-\u9fa5]/g, '-')
-              .replace(/-+/g, '-')}`;
-          }
-
-          let finalEvrId = evrId;
-          let suffix = 1;
-          while (existingAnchors.has(finalEvrId)) {
-            finalEvrId = `${evrId}-${suffix}`;
-            suffix++;
-          }
-
-          existingAnchors.add(finalEvrId);
-
-          // 修改当前行，添加锚点
-          const lineWithAnchor = `## ${title} <!-- evr:${finalEvrId} -->`;
-          fixedLines[fixedLines.length - 1] = lineWithAnchor;
-
-          this.addToleranceFix(
-            'generate_anchor',
-            `为 EVR 生成锚点: ${finalEvrId}`,
-            i + 1,
-            line,
-            lineWithAnchor
-          );
-        }
-      }
+      // EVR 现在使用列表项格式，不再需要为 ### 标题生成锚点
     }
 
     return fixedLines;
@@ -1158,10 +1027,11 @@ export class PanelParser {
           sections.set(currentSection, []);
         }
 
-        // 跳过一级和二级标题（区域标题），但保留三级及以下标题
+        // 跳过一级和二级标题（区域标题）
+        // EVR 现在使用列表项格式，不再使用 ### 标题
         if (
           trimmedLine.startsWith('# ') ||
-          (trimmedLine.startsWith('## ') && !trimmedLine.startsWith('### '))
+          trimmedLine.startsWith('## ')
         ) {
           continue;
         }
@@ -1563,6 +1433,26 @@ export class PanelParser {
     if (lowerStatus === 'skip' || lowerStatus === '跳过') return EVRStatus.Skip;
 
     return EVRStatus.Unknown;
+  }
+
+  /**
+   * 从复选框字符解析 EVR 状态
+   * [ ] → unknown, [x] → pass, [!] → fail, [-] → skip
+   */
+  private parseEVRStatusFromCheckbox(checkboxChar: string): EVRStatus {
+    switch (checkboxChar) {
+      case 'x':
+      case 'X':
+        return EVRStatus.Pass;
+      case '!':
+        return EVRStatus.Fail;
+      case '-':
+      case '~':
+        return EVRStatus.Skip;
+      case ' ':
+      default:
+        return EVRStatus.Unknown;
+    }
   }
 
   /**

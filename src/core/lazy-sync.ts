@@ -1093,9 +1093,9 @@ export class LazySync {
     let currentEVRContent: string[] = [];
 
     for (const line of lines) {
-      // 匹配 EVR 行：### EVR-001 标题 <!-- evr:evr-001 -->
+      // 匹配 EVR 行：1. [ ] EVR 标题 <!-- evr:evr-001 -->
       const evrMatch = line.match(
-        /^###\s*(.+?)(?:\s*<!--\s*evr:([^>]+)\s*-->)?/
+        /^\d+\.\s*\[.\]\s*(.+?)(?:\s*<!--\s*evr:([^>]+)\s*-->)?/
       );
       if (evrMatch) {
         // 保存上一个 EVR

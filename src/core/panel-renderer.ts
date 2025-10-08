@@ -11,6 +11,7 @@ import {
   LogAction,
   TaskStatus,
   CheckboxState,
+  EVRStatus,
   type ParsedPanel,
   type ParsedPlan,
   type ParsedEVR,
@@ -250,102 +251,121 @@ export class PanelRenderer {
 
   /**
    * 渲染 EVR 列表
-   * 使用标签化条目格式，符合设计文档规范
+   * 使用列表项格式（带复选框），符合设计文档规范
+   * 格式：1. [ ] EVR 标题 <!-- evr:evr-id -->
    */
   renderEVRs(evrs: ParsedEVR[]): string {
     const lines: string[] = [];
 
     evrs.forEach((evr, index) => {
-      // 渲染 EVR 标题行，使用稳定锚点（evr.id 或 evr.anchor）
-      // 注意：不要在这里注入锚点，因为 injectStableAnchors 会处理
+      const evrNumber = index + 1;
+
+      // 将 EVR 状态转换为复选框
+      // EVR 状态：pass/fail/skip/unknown 映射到复选框
+      const checkbox = this.formatEVRCheckboxState(evr.status);
+
+      // 渲染 EVR 主行 - 使用列表项格式
       const anchorId = evr.anchor || evr.id;
-      let evrLine = `### ${evr.title}`;
+      let evrLine = `${evrNumber}. ${checkbox} ${evr.title}`;
       if (anchorId) {
         evrLine += ` <!-- evr:${anchorId} -->`;
       }
       lines.push(evrLine);
       lines.push('');
 
-      // 渲染 verify 字段 - 使用标签化条目格式
+      // 渲染标签化条目 - 缩进3空格作为列表项的子内容
+      const indent = '   '; // 3 空格缩进
+
+      // 渲染 verify 字段
       if (evr.verify) {
         if (Array.isArray(evr.verify)) {
-          // 数组格式：每个项目一行
-          evr.verify.forEach((item, idx) => {
-            if (idx === 0) {
-              lines.push(`- [verify] ${item}`);
-            } else {
-              lines.push(`- [verify] ${item}`);
-            }
+          evr.verify.forEach((item) => {
+            lines.push(`${indent}- [verify] ${item}`);
           });
         } else {
-          lines.push(`- [verify] ${evr.verify}`);
+          lines.push(`${indent}- [verify] ${evr.verify}`);
         }
       }
 
-      // 渲染 expect 字段 - 使用标签化条目格式
+      // 渲染 expect 字段
       if (evr.expect) {
         if (Array.isArray(evr.expect)) {
-          // 数组格式：每个项目一行
-          evr.expect.forEach((item, idx) => {
-            if (idx === 0) {
-              lines.push(`- [expect] ${item}`);
-            } else {
-              lines.push(`- [expect] ${item}`);
-            }
+          evr.expect.forEach((item) => {
+            lines.push(`${indent}- [expect] ${item}`);
           });
         } else {
-          lines.push(`- [expect] ${evr.expect}`);
+          lines.push(`${indent}- [expect] ${evr.expect}`);
         }
       }
 
-      // 渲染状态 - 使用标签化条目格式
-      lines.push(`- [status] ${evr.status}`);
+      // 渲染状态
+      lines.push(`${indent}- [status] ${evr.status}`);
 
-      // 渲染 class - 使用标签化条目格式
+      // 渲染 class
       if (evr.class) {
-        lines.push(`- [class] ${evr.class}`);
+        lines.push(`${indent}- [class] ${evr.class}`);
       }
 
-      // 渲染 last_run - 使用标签化条目格式
+      // 渲染 last_run
       if (evr.lastRun) {
-        lines.push(`- [last_run] ${evr.lastRun}`);
+        lines.push(`${indent}- [last_run] ${evr.lastRun}`);
       }
 
-      // 渲染 notes - 使用标签化条目格式
+      // 渲染 notes
       if (evr.notes) {
-        lines.push(`- [notes] ${evr.notes}`);
+        lines.push(`${indent}- [notes] ${evr.notes}`);
       }
 
-      // 渲染 proof - 使用标签化条目格式
+      // 渲染 proof
       if (evr.proof) {
-        lines.push(`- [proof] ${evr.proof}`);
+        lines.push(`${indent}- [proof] ${evr.proof}`);
       }
 
       lines.push('');
 
-      // 渲染验证运行记录（保持不变）
+      // 渲染验证运行记录（可选，缩进显示）
       if (evr.runs && evr.runs.length > 0) {
-        lines.push('**Verification Runs:**');
+        lines.push(`${indent}**Verification Runs:**`);
         evr.runs.forEach((run) => {
-          lines.push(`- ${run.at} by ${run.by}: ${run.status}`);
+          lines.push(`${indent}- ${run.at} by ${run.by}: ${run.status}`);
           if (run.notes) {
-            lines.push(`  Notes: ${run.notes}`);
+            lines.push(`${indent}  Notes: ${run.notes}`);
           }
           if (run.proof) {
-            lines.push(`  Proof: ${run.proof}`);
+            lines.push(`${indent}  Proof: ${run.proof}`);
           }
         });
-        lines.push('');
-      }
-
-      // 在 EVR 之间添加分隔线
-      if (index < evrs.length - 1) {
-        lines.push('---');
         lines.push('');
       }
     });
 
     return lines.join('\n');
+  }
+
+  /**
+   * 格式化 EVR 复选框状态
+   * EVR 状态映射：
+   * - unknown → [ ] (待验证)
+   * - pass → [x] (通过)
+   * - fail → [!] (失败)
+   * - skip → [-] (跳过)
+   */
+  formatEVRCheckboxState(status: string): string {
+    switch (status) {
+      case EVRStatus.Pass:
+      case 'pass':
+        return '[x]';
+      case EVRStatus.Fail:
+      case 'fail':
+        return '[!]';
+      case EVRStatus.Skip:
+      case 'skip':
+        return '[-]';
+      case EVRStatus.Unknown:
+      case 'unknown':
+      default:
+        return '[ ]';
+    }
   }
 
   /**

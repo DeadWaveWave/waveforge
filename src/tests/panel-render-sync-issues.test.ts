@@ -21,8 +21,8 @@ describe('Panel Render & Sync Issues (深度 E2E 分析报告)', () => {
         lazySync = createLazySync();
     });
 
-    describe('问题 1: EVR 格式 - 使用标签化条目 ✅', () => {
-        it('应该使用标签化条目格式渲染 EVR', () => {
+    describe('问题 1: EVR 格式 - 使用列表项格式 ✅', () => {
+        it('应该使用列表项格式渲染 EVR（带复选框和编号）', () => {
             const parsedPanel: ParsedPanel = {
                 title: '测试任务',
                 requirements: [],
@@ -53,18 +53,21 @@ describe('Panel Render & Sync Issues (深度 E2E 分析报告)', () => {
 
             const rendered = renderer.renderToMarkdown(parsedPanel);
 
-            // 应该包含标签化条目格式
-            expect(rendered).toContain('- [verify] curl -X POST /api/upload');
-            expect(rendered).toContain('- [expect] 返回 200 状态码和上传链接');
-            expect(rendered).toContain('- [status] unknown');
-            expect(rendered).toContain('- [class] runtime');
+            // 应该使用列表项格式（带编号和复选框）
+            expect(rendered).toContain('1. [ ] API 接口正常响应 <!-- evr:evr-001 -->');
 
-            // 不应该包含旧格式
+            // 标签化条目应该缩进3空格
+            expect(rendered).toContain('   - [verify] curl -X POST /api/upload');
+            expect(rendered).toContain('   - [expect] 返回 200 状态码和上传链接');
+            expect(rendered).toContain('   - [status] unknown');
+            expect(rendered).toContain('   - [class] runtime');
+
+            // 不应该包含旧的标题格式
+            expect(rendered).not.toContain('### API 接口');
             expect(rendered).not.toContain('**Verify:**');
-            expect(rendered).not.toContain('**Expect:**');
         });
 
-        it('数组类型的 verify 和 expect 应该正确渲染', () => {
+        it('数组类型的 verify 和 expect 应该正确渲染为多个标签行', () => {
             const parsedPanel: ParsedPanel = {
                 title: '测试任务',
                 requirements: [],
@@ -95,13 +98,17 @@ describe('Panel Render & Sync Issues (深度 E2E 分析报告)', () => {
 
             const rendered = renderer.renderToMarkdown(parsedPanel);
 
-            // 应该有多个标签行
-            expect(rendered).toContain('- [verify] 上传 .jpg 文件');
-            expect(rendered).toContain('- [verify] 上传 .pdf 文件');
-            expect(rendered).toContain('- [expect] JPG 上传成功');
+            // 应该使用列表项格式
+            expect(rendered).toContain('1. [ ] 支持多种文件格式');
 
-            // 不应该使用折叠
+            // 应该有多个缩进的标签行
+            expect(rendered).toContain('   - [verify] 上传 .jpg 文件');
+            expect(rendered).toContain('   - [verify] 上传 .pdf 文件');
+            expect(rendered).toContain('   - [expect] JPG 上传成功');
+
+            // 不应该使用折叠或旧标题格式
             expect(rendered).not.toContain('<details>');
+            expect(rendered).not.toContain('###');
         });
     });
 
@@ -202,11 +209,11 @@ describe('Panel Render & Sync Issues (深度 E2E 分析报告)', () => {
 
 ## Expected Visible Results
 
-### 测试结果 1 <!-- evr:evr-stable-001 -->
+1. [ ] 测试结果 1 <!-- evr:evr-stable-001 -->
 
-- [verify] 测试
-- [expect] 通过
-- [status] unknown
+   - [verify] 测试
+   - [expect] 通过
+   - [status] unknown
 `;
 
             const parsed1 = parser.parseMarkdown(panel);
@@ -251,6 +258,34 @@ describe('Panel Render & Sync Issues (深度 E2E 分析报告)', () => {
             const rendered = renderer.renderToMarkdown(parsedPanel);
             expect(rendered).toContain('> 提示 1');
             expect(rendered).toContain('> 提示 2');
+        });
+    });
+
+    describe('EVR 复选框状态映射', () => {
+        it('应该正确映射 EVR 状态到复选框', () => {
+            const evrs = [
+                { id: 'evr-1', title: 'Pass EVR', verify: 'test', expect: 'ok', status: EVRStatus.Pass, runs: [], anchor: 'evr-1' },
+                { id: 'evr-2', title: 'Fail EVR', verify: 'test', expect: 'ok', status: EVRStatus.Fail, runs: [], anchor: 'evr-2' },
+                { id: 'evr-3', title: 'Skip EVR', verify: 'test', expect: 'ok', status: EVRStatus.Skip, runs: [], anchor: 'evr-3' },
+                { id: 'evr-4', title: 'Unknown EVR', verify: 'test', expect: 'ok', status: EVRStatus.Unknown, runs: [], anchor: 'evr-4' },
+            ];
+
+            const rendered = renderer.renderToMarkdown({
+                title: '状态测试',
+                requirements: [],
+                issues: [],
+                hints: [],
+                plans: [],
+                evrs,
+                logs: [],
+                metadata: { parsedAt: new Date().toISOString(), parserVersion: '1.0.0', stats: { totalPlans: 0, totalSteps: 0, totalEVRs: 4, parseErrors: 0, toleranceFixCount: 0 }, parseErrors: [], toleranceFixes: [] },
+            });
+
+            // 验证状态映射
+            expect(rendered).toContain('1. [x] Pass EVR'); // pass → [x]
+            expect(rendered).toContain('2. [!] Fail EVR'); // fail → [!]
+            expect(rendered).toContain('3. [-] Skip EVR'); // skip → [-]
+            expect(rendered).toContain('4. [ ] Unknown EVR'); // unknown → [ ]
         });
     });
 
@@ -300,8 +335,8 @@ describe('Panel Render & Sync Issues (深度 E2E 分析报告)', () => {
             const planAnchorCount = (planAnchors?.match(/<!--/g) || []).length;
             expect(planAnchorCount).toBe(1);
 
-            // 验证：EVR 只有一个锚点
-            const evrAnchors = rendered.match(/### 测试 EVR.*?<!--.*?-->/)?.[0];
+            // 验证：EVR 只有一个锚点（使用列表项格式）
+            const evrAnchors = rendered.match(/1\. \[ \] 测试 EVR.*?<!--.*?-->/)?.[0];
             const evrAnchorCount = (evrAnchors?.match(/<!--/g) || []).length;
             expect(evrAnchorCount).toBe(1);
         });
