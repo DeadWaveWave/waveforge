@@ -209,7 +209,7 @@ export const CurrentTaskInitSchema = {
  */
 export const CurrentTaskUpdateSchema = {
   name: 'current_task_update',
-  description: '在计划和步骤两个层级更新任务进度，支持状态管理和自动推进。支持通过 plan_no/step_no 序号或 plan_id/step_id UUID 定位节点。',
+  description: '更新任务的“状态”，包括计划、步骤和 EVR 的运行状态。这是确认状态变更（例如，将在 .wave/current-task.md 面板勾选复选框从未经确认的“pending”状态正式同步为“completed”状态）的唯一途径。请勿用此工具修改任务的文本内容。',
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -309,7 +309,7 @@ export const CurrentTaskUpdateSchema = {
  */
 export const CurrentTaskReadSchema = {
   name: 'current_task_read',
-  description: '读取当前任务完整状态以恢复上下文，支持 EVR 相关参数和同步预览。返回 task-level hints，不返回 plan/step hints（符合级别隔离原则）。',
+  description: '读取当前任务的完整状态以恢复上下文。此工具会进行一次“干跑”（dry-run）同步：如果 .wave/current-task.md 面板被手动编辑过，它将返回 panel_pending=true 及 sync_preview 字段来展示差异，但不会将这些改动写入结构化数据。',
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -361,7 +361,7 @@ export const CurrentTaskReadSchema = {
  */
 export const CurrentTaskModifySchema = {
   name: 'current_task_modify',
-  description: '动态修改任务结构，包括计划、步骤、目标和EVR内容，支持提示管理。支持 replace/append/insert/remove/update/add 操作，支持 plan_no/step_no 序号定位。',
+  description: '动态修改任务的“内容”和“结构”，例如：修改计划或步骤的文本描述、增删计划、调整 EVR 的定义（如何验证、预期结果）等。此工具会自动同步 .wave/current-task.md 面板上的用户编辑。请勿用此工具更新状态。',
   inputSchema: {
     type: 'object' as const,
     properties: {
@@ -504,7 +504,7 @@ export const CurrentTaskModifySchema = {
  */
 export const CurrentTaskCompleteSchema = {
   name: 'current_task_complete',
-  description: '完成当前任务并生成文档，支持开发日志生成建议',
+  description: '完成当前任务。在调用前，会强制检查所有 EVR (预期可见结果) 是否都处于 pass 或 skip 状态。如果检查失败，任务将无法完成。此工具也会自动同步 .wave/current-task.md 面板上的用户编辑。',
   inputSchema: {
     type: 'object' as const,
     properties: {

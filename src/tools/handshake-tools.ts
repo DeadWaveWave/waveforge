@@ -285,7 +285,7 @@ export class ProjectInfoTool extends BaseHandshakeTool {
     return {
       name: 'project_info',
       description:
-        '获取当前连接状态和项目信息，握手流程的入口点。必须首先调用此工具检查连接状态。',
+        '获取当前连接状态和项目信息，是 Agent 工作流的入口点。必须在会话开始时首先调用此工具，以检查是否已连接到项目。',
       inputSchema: {
         type: 'object' as const,
         properties: {},
@@ -524,7 +524,7 @@ export class ConnectProjectTool extends BaseHandshakeTool {
     return {
       name: 'connect_project',
       description:
-        '连接项目到当前会话。支持通过绝对路径、项目 slug 或仓库地址连接。连接成功后才能使用其他任务管理工具。参数 root/project_path/slug/repo 至少提供一个。',
+        '连接项目到当前会话。当 project_info 返回 connected=false 时调用此工具。支持通过绝对路径、项目 slug 或仓库地址连接。连接成功后，必须再次调用 project_info 确认状态并获取任务信息。',
       inputSchema: {
         type: 'object' as const,
         properties: {
