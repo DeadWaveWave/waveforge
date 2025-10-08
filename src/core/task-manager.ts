@@ -1799,7 +1799,9 @@ export class TaskManager {
         if (active?.project_id) {
           activeProjectId = active.project_id;
         }
-      } catch {}
+      } catch {
+        // Ignore errors when reading active project
+      }
 
       const docsPath = await this.resolveProjectPath(activeProjectId);
       const historyDir = path.join(docsPath, 'history');
