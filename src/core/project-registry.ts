@@ -213,12 +213,19 @@ export class ProjectRegistry {
         error: error instanceof Error ? error.message : String(error),
       });
 
-      // 如果是超时错误，不抛出异常，只记录警告
-      if (error instanceof Error && error.message.includes('超时')) {
+      // 以下错误视为非致命：超时、权限不足、只读文件系统
+      const msg = error instanceof Error ? error.message : String(error);
+      if (
+        msg.includes('超时') ||
+        msg.includes('EPERM') ||
+        msg.includes('EACCES') ||
+        msg.toLowerCase().includes('permission') ||
+        msg.toLowerCase().includes('read-only')
+      ) {
         logger.warning(
           LogCategory.Task,
           LogAction.Update,
-          '全局注册表更新超时，跳过此操作',
+          '全局注册表不可写，跳过更新（不影响主要功能）',
           {
             projectId: record.id,
           }

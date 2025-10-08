@@ -4,6 +4,8 @@
  */
 
 import { logger } from '../core/logger.js';
+import { MultiTaskDirectoryManager } from '../core/multi-task-directory-manager.js';
+import * as path from 'path';
 import {
   errorHandler,
   ValidationError,
@@ -178,18 +180,19 @@ export class TaskListTool extends BaseMultiTaskTool {
    */
   private async getTaskList(params: TaskListParams): Promise<TaskListResponse> {
     try {
+      // 基于当前活动项目动态解析 .wave 路径，避免使用服务器启动目录
+      const panelPath = this.taskManager.getCurrentTaskPanelPath();
+      const docsPath = panelPath ? path.dirname(panelPath) : this.taskManager.getDocsPath();
+      const mgr = new MultiTaskDirectoryManager(docsPath);
+
       // 获取所有任务目录
-      const taskDirs =
-        await this.multiTaskDirectoryManager.listAllTaskDirectories();
+      const taskDirs = await mgr.listAllTaskDirectories();
 
       // 加载任务摘要信息
       const allTasks = [];
       for (const dirInfo of taskDirs) {
         try {
-          const task =
-            await this.multiTaskDirectoryManager.loadTaskFromDirectory(
-              dirInfo.fullPath
-            );
+          const task = await mgr.loadTaskFromDirectory(dirInfo.fullPath);
           if (task) {
             // 确定任务状态
             const status = this.determineTaskStatus(task);
@@ -425,18 +428,20 @@ export class TaskSwitchTool extends BaseMultiTaskTool {
     params: TaskSwitchParams
   ): Promise<TaskSwitchResponse> {
     try {
+      // 基于当前活动项目动态解析 .wave 路径，避免使用服务器启动目录
+      const panelPath = this.taskManager.getCurrentTaskPanelPath();
+      const docsPath = panelPath ? path.dirname(panelPath) : this.taskManager.getDocsPath();
+      const mgr = new MultiTaskDirectoryManager(docsPath);
+
       // 查找目标任务目录
-      const taskDir = await this.multiTaskDirectoryManager.findTaskDirectory(
-        params.task_id
-      );
+      const taskDir = await mgr.findTaskDirectory(params.task_id);
 
       if (!taskDir) {
         throw new NotFoundError(`任务不存在: ${params.task_id}`);
       }
 
       // 加载目标任务
-      const targetTask =
-        await this.multiTaskDirectoryManager.loadTaskFromDirectory(taskDir);
+      const targetTask = await mgr.loadTaskFromDirectory(taskDir);
 
       if (!targetTask) {
         throw new NotFoundError(`无法加载任务: ${params.task_id}`);
@@ -448,18 +453,12 @@ export class TaskSwitchTool extends BaseMultiTaskTool {
       );
       if (currentTask) {
         // 将当前任务保存到其对应的目录中
-        const currentTaskDir =
-          await this.multiTaskDirectoryManager.findTaskDirectory(
-            currentTask.id
-          );
+        const currentTaskDir = await mgr.findTaskDirectory(currentTask.id);
         if (currentTaskDir) {
-          await this.multiTaskDirectoryManager.updateTaskInDirectory(
-            currentTask,
-            currentTaskDir
-          );
+          await mgr.updateTaskInDirectory(currentTask, currentTaskDir);
         } else {
           // 如果找不到目录，创建新的目录保存
-          await this.multiTaskDirectoryManager.saveTaskToDirectory(currentTask);
+          await mgr.saveTaskToDirectory(currentTask);
         }
       }
 
@@ -468,10 +467,7 @@ export class TaskSwitchTool extends BaseMultiTaskTool {
 
       // 更新任务的最后访问时间
       targetTask.updated_at = new Date().toISOString();
-      await this.multiTaskDirectoryManager.updateTaskInDirectory(
-        targetTask,
-        taskDir
-      );
+      await mgr.updateTaskInDirectory(targetTask, taskDir);
 
       // 更新索引（如果有索引管理器的话）
       if (this.taskIndexManager) {

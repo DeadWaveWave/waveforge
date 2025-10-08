@@ -110,9 +110,29 @@ export class ProjectManager {
 
     try {
       // 验证项目是否仍然有效
-      const projectRecord = await this.projectRegistry.resolveProject(
+      let projectRecord = await this.projectRegistry.resolveProject(
         this.activeBinding.project_id
       );
+
+      // 当全局注册表不可用或未持久化时，回退到本地 .wave/project.json 验证
+      if (!projectRecord && this.activeBinding.root) {
+        try {
+          const localInfo = await this.projectRegistry.loadByPath(
+            this.activeBinding.root
+          );
+          if (localInfo && localInfo.id === this.activeBinding.project_id) {
+            projectRecord = {
+              id: localInfo.id,
+              root: this.activeBinding.root,
+              slug: localInfo.slug,
+              origin: localInfo.origin,
+              last_seen: new Date().toISOString(),
+            };
+          }
+        } catch {
+          // ignore and keep projectRecord as null
+        }
+      }
 
       if (!projectRecord) {
         // 项目已失效，清除绑定

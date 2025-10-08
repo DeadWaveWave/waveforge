@@ -206,12 +206,14 @@ export class TaskManager {
    */
   getCurrentTaskPanelPath(): string | null {
     try {
-      // current-task.md 应该在 .wave 目录下
-      const panelPath = path.join(this.docsPath, 'current-task.md');
+      // 如果有活跃项目，优先使用该项目的 .wave 目录
+      const active = this.projectManager?.getActiveProject();
+      if (active?.root) {
+        return path.join(active.root, '.wave', 'current-task.md');
+      }
 
-      // 不检查文件是否存在，直接返回路径
-      // 这样在同步检测时可以正确找到路径
-      return panelPath;
+      // 回退到初始化时的 docsPath
+      return path.join(this.docsPath, 'current-task.md');
     } catch (error) {
       return null;
     }
@@ -286,7 +288,8 @@ export class TaskManager {
     if (!effectiveProjectId) {
       const activeProject = this.projectManager.getActiveProject();
       if (activeProject) {
-        effectiveProjectId = activeProject.root;
+        // 使用项目ID而不是root路径以兼容 resolveProject 要求
+        effectiveProjectId = activeProject.project_id;
       } else {
         // 没有活动项目,使用默认路径
         return this.docsPath;
@@ -456,7 +459,8 @@ export class TaskManager {
         expectedResults: task.expectedResults || [],
         createdAt: task.created_at,
         updatedAt: task.updated_at,
-        projectId: this.projectManager?.getActiveProject()?.root || '',
+        // 使用活动项目的ID作为 projectId，避免与路径混淆
+        projectId: this.projectManager?.getActiveProject()?.project_id || '',
         panelModTime, // 传递面板修改时间
       };
 
@@ -809,7 +813,7 @@ export class TaskManager {
 
       // 如果没有传入 projectId，尝试从当前活动项目获取
       const effectiveProjectId =
-        projectId || this.projectManager?.getActiveProject()?.root;
+        projectId || this.projectManager?.getActiveProject()?.project_id;
 
       const taskPath = await this.resolveTaskPath(effectiveProjectId);
 
@@ -1168,19 +1172,19 @@ export class TaskManager {
 
     // 同时保存到多任务目录结构
     try {
+      // 使用当前项目的 .wave 路径初始化目录管理器，避免写入服务器启动目录
+      const docsPathForProject = await this.resolveProjectPath(projectId);
+      const projectDirManager = new MultiTaskDirectoryManager(docsPathForProject);
+
       // 检查任务是否已经存在于多任务目录中
-      const existingTaskDir =
-        await this.multiTaskDirectoryManager.findTaskDirectory(task.id);
+      const existingTaskDir = await projectDirManager.findTaskDirectory(task.id);
 
       if (existingTaskDir) {
         // 更新现有任务
-        await this.multiTaskDirectoryManager.updateTaskInDirectory(
-          task,
-          existingTaskDir
-        );
+        await projectDirManager.updateTaskInDirectory(task, existingTaskDir);
       } else {
         // 创建新的任务目录
-        await this.multiTaskDirectoryManager.saveTaskToDirectory(task);
+        await projectDirManager.saveTaskToDirectory(task);
       }
     } catch (error) {
       // 多任务目录保存失败不应该影响主要功能
@@ -1787,7 +1791,18 @@ export class TaskManager {
    */
   async getTaskHistory(): Promise<any[]> {
     try {
-      const historyDir = path.join(this.docsPath, 'history');
+      // 优先使用当前绑定项目的 .wave 路径
+      let activeProjectId: string | undefined;
+      try {
+        // 访问活跃项目（存在则使用其 project_id）
+        const active = this.projectManager?.getActiveProject();
+        if (active?.project_id) {
+          activeProjectId = active.project_id;
+        }
+      } catch {}
+
+      const docsPath = await this.resolveProjectPath(activeProjectId);
+      const historyDir = path.join(docsPath, 'history');
 
       if (!(await fs.pathExists(historyDir))) {
         return [];

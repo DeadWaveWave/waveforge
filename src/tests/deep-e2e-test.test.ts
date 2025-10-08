@@ -59,7 +59,8 @@ describe('深度端到端测试 - 设计文档符合性验证', () => {
 
   // 辅助函数：读取并显示面板内容
   async function readAndLogPanel(stepName: string): Promise<string> {
-    const panelPath = path.join(tempDir, '.wave', 'current-task.md');
+    // 文档现按绑定项目落在 testProjectPath/.wave 下
+    const panelPath = path.join(testProjectPath, '.wave', 'current-task.md');
     if (await fs.pathExists(panelPath)) {
       const content = await fs.readFile(panelPath, 'utf-8');
       console.log(`\n========== ${stepName} - current-task.md 内容 ==========`);
@@ -73,7 +74,7 @@ describe('深度端到端测试 - 设计文档符合性验证', () => {
 
   // 辅助函数：手动编辑面板
   async function editPanel(modifier: (content: string) => string): Promise<void> {
-    const panelPath = path.join(tempDir, '.wave', 'current-task.md');
+    const panelPath = path.join(testProjectPath, '.wave', 'current-task.md');
     const content = await fs.readFile(panelPath, 'utf-8');
     const modified = modifier(content);
     await fs.writeFile(panelPath, modified, 'utf-8');

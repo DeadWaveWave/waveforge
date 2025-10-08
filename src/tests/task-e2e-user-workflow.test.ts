@@ -74,7 +74,8 @@ describe('端到端用户工作流测试', () => {
    * 辅助函数: 读取并解析 current-task.md
    */
   async function readPanelContent(): Promise<string> {
-    const panelPath = path.join(tempDir, '.wave', 'current-task.md');
+    // 文档现按绑定项目落在 testProjectPath/.wave 下
+    const panelPath = path.join(testProjectPath, '.wave', 'current-task.md');
     if (await fs.pathExists(panelPath)) {
       return await fs.readFile(panelPath, 'utf-8');
     }
@@ -123,7 +124,7 @@ describe('端到端用户工作流测试', () => {
   async function editPanel(modifier: (content: string) => string): Promise<void> {
     const content = await readPanelContent();
     const modified = modifier(content);
-    const panelPath = path.join(tempDir, '.wave', 'current-task.md');
+    const panelPath = path.join(testProjectPath, '.wave', 'current-task.md');
     await fs.writeFile(panelPath, modified, 'utf-8');
     // 等待一小段时间,确保文件系统同步
     await new Promise(resolve => setTimeout(resolve, 100));
