@@ -824,7 +824,13 @@ export class TaskManager {
         return null;
       }
 
-      const task: CurrentTask = JSON.parse(data);
+      let task: CurrentTask;
+      try {
+        task = JSON.parse(data);
+      } catch (e) {
+        // 统一错误信息，便于上层与测试用例判断
+        throw new Error('任务数据格式错误');
+      }
 
       // 确保必要字段存在（破坏性更新）
       if (task.overall_plan) {
@@ -857,6 +863,10 @@ export class TaskManager {
           error.message.includes('no such file'))
       ) {
         return null;
+      }
+      // 透传规范化后的“任务数据格式错误”，其余错误继续抛出
+      if (error instanceof Error && error.message === '任务数据格式错误') {
+        throw error;
       }
       throw error;
     }
@@ -1371,10 +1381,9 @@ export class TaskManager {
       throw new Error('状态转换无效：不能从阻塞状态直接转换到完成状态');
     }
 
-    // 计划级门槛检查：尝试完成计划时检查 EVR 就绪性
-    if (params.status === TaskStatus.Completed && plan.evrBindings?.length > 0) {
+    // 计划级门槛检查：尝试完成计划时检查 EVR 就绪性（按引用关系判断是否绑定）
+    if (params.status === TaskStatus.Completed) {
       const allEVRs = task.expectedResults || [];
-
       const gateResult = this.evrValidator.checkPlanGate(plan.id, allEVRs);
       if (!gateResult.canComplete) {
         // 阻止计划完成，返回 evr_pending
@@ -1458,15 +1467,15 @@ export class TaskManager {
       }
     }
 
-    // EVR 引导：当计划切换到 in_progress 时返回绑定的 EVR
-    // 从 task 对象中查找最新的 plan（确保获取到保存后的状态）
+    // EVR 引导：当计划切换到 in_progress 时返回绑定的 EVR（按引用关系收集）
     const currentPlan = task.overall_plan.find(p => p.id === plan.id);
     let evrForNode: string[] = [];
 
     if (params.status === TaskStatus.InProgress && currentPlan) {
-      evrForNode = Array.isArray(currentPlan.evrBindings)
-        ? [...currentPlan.evrBindings]
-        : [];
+      const allEVRs = task.expectedResults || [];
+      evrForNode = allEVRs
+        .filter(evr => Array.isArray(evr.referencedBy) && evr.referencedBy.includes(currentPlan!.id))
+        .map(evr => evr.id);
     }
 
     logger.info(LogCategory.Task, LogAction.Update, 'Plan 状态更新完成，EVR 引导', {
