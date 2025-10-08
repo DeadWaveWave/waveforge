@@ -1,0 +1,6 @@
+tasks/
+backup/
+history/
+legacy/
+project.json
+current-task.json
