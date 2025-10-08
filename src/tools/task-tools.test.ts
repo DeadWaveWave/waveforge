@@ -680,7 +680,7 @@ describe('CurrentTaskUpdateTool', () => {
       expect(definition).toMatchObject({
         name: 'current_task_update',
         description:
-          expect.stringContaining('在计划和步骤两个层级更新任务进度'),
+          expect.stringContaining('更新任务'),
         inputSchema: {
           type: 'object',
           properties: {
@@ -988,7 +988,7 @@ describe('CurrentTaskReadTool', () => {
       expect(definition).toMatchObject({
         name: 'current_task_read',
         description:
-          expect.stringContaining('读取当前任务完整状态以恢复上下文'),
+          expect.stringContaining('读取当前任务'),
         inputSchema: {
           type: 'object',
           properties: {

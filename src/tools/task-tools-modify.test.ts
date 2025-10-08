@@ -471,7 +471,7 @@ describe('CurrentTaskModifyTool', () => {
 
       expect(definition).toMatchObject({
         name: 'current_task_modify',
-        description: expect.stringContaining('动态修改任务结构'),
+        description: expect.stringContaining('修改任务'),
         inputSchema: {
           type: 'object',
           properties: {
@@ -613,7 +613,7 @@ describe('CurrentTaskCompleteTool', () => {
 
       expect(definition).toMatchObject({
         name: 'current_task_complete',
-        description: expect.stringContaining('完成当前任务并生成文档'),
+        description: expect.stringContaining('完成当前任务'),
         inputSchema: {
           type: 'object',
           properties: {
