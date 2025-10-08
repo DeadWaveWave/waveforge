@@ -101,11 +101,69 @@ class WaveForgeServer {
       this.middleware.wrapAsync(
         async () => {
           const tools = toolRegistry.getToolDefinitions();
+
+          // 将 Schema 规范化以兼容 Codex/OpenAI 工具映射
+          const sanitizeSchema = (schema: any): any => {
+            if (!schema || typeof schema !== 'object') return schema;
+
+            const cloned: any = Array.isArray(schema) ? [] : { ...schema };
+
+            // 规范化类型：integer -> number
+            if (cloned.type === 'integer') {
+              cloned.type = 'number';
+            }
+
+            // 递归处理联合类型数组（保持原状，OpenAI 支持 number/string/boolean/array/object）
+            if (Array.isArray(cloned.type)) {
+              // 不做强制裁剪，但如果包含 'integer' 则替换为 'number'
+              cloned.type = cloned.type.map((t: any) => (t === 'integer' ? 'number' : t));
+            }
+
+            // 递归属性
+            if (cloned.properties && typeof cloned.properties === 'object') {
+              cloned.properties = Object.fromEntries(
+                Object.entries(cloned.properties).map(([k, v]: [string, any]) => {
+                  const vv = sanitizeSchema(v);
+                  // 为缺失类型但语义明确的字段补充类型（content/verify/expect）
+                  if (
+                    vv &&
+                    typeof vv === 'object' &&
+                    vv.type === undefined &&
+                    (k === 'content' || k === 'verify' || k === 'expect')
+                  ) {
+                    vv.type = ['string', 'array'];
+                    vv.items = { type: 'string' };
+                  }
+                  return [k, vv];
+                })
+              );
+            }
+
+            // 递归 items
+            if (cloned.items) {
+              cloned.items = sanitizeSchema(cloned.items);
+            }
+
+            // 递归 anyOf/oneOf/allOf（若存在）
+            ['anyOf', 'oneOf', 'allOf'].forEach((key) => {
+              if (Array.isArray(cloned[key])) {
+                cloned[key] = cloned[key].map((x: any) => sanitizeSchema(x));
+              }
+            });
+
+            return cloned;
+          };
+
+          const sanitized = tools.map((t) => ({
+            ...t,
+            inputSchema: sanitizeSchema(t.inputSchema),
+          }));
+
           logger.info(LogCategory.Task, LogAction.Handle, '工具列表请求', {
-            toolCount: tools.length,
-            tools: tools.map((t) => t.name),
+            toolCount: sanitized.length,
+            tools: sanitized.map((t) => t.name),
           });
-          return { tools };
+          return { tools: sanitized };
         },
         { operation: 'list_tools' }
       )

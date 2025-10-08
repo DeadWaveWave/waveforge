@@ -996,7 +996,13 @@ export function generateExampleParams(toolName: string): any {
   if ('properties' in schema.inputSchema) {
     Object.entries(schema.inputSchema.properties).forEach(
       ([fieldName, fieldSchema]: [string, any]) => {
-        if (fieldSchema.type === 'string') {
+        const t = fieldSchema.type;
+        const isString = t === 'string' || (Array.isArray(t) && t.includes('string'));
+        const isNumber = t === 'number' || t === 'integer';
+        const isBoolean = t === 'boolean';
+        const isArray = t === 'array' || (Array.isArray(t) && t.includes('array'));
+
+        if (isString) {
           if (fieldSchema.enum) {
             example[fieldName] = fieldSchema.enum[0];
           } else if (fieldName === 'title') {
@@ -1014,7 +1020,7 @@ export function generateExampleParams(toolName: string): any {
           } else {
             example[fieldName] = '示例文本';
           }
-        } else if (fieldSchema.type === 'integer') {
+        } else if (isNumber) {
           if (fieldSchema.default !== undefined) {
             example[fieldName] = fieldSchema.default;
           } else if (fieldSchema.minimum !== undefined) {
@@ -1022,10 +1028,10 @@ export function generateExampleParams(toolName: string): any {
           } else {
             example[fieldName] = 1;
           }
-        } else if (fieldSchema.type === 'boolean') {
+        } else if (isBoolean) {
           example[fieldName] =
             fieldSchema.default !== undefined ? fieldSchema.default : true;
-        } else if (fieldSchema.type === 'array') {
+        } else if (isArray) {
           if (fieldName === 'knowledge_refs') {
             example[fieldName] = ['参考资料1', '参考资料2'];
           } else if (fieldName === 'overall_plan') {
@@ -1038,6 +1044,13 @@ export function generateExampleParams(toolName: string): any {
           if (fieldSchema.oneOf[0].type === 'string') {
             example[fieldName] = '示例内容';
           } else if (fieldSchema.oneOf[0].type === 'array') {
+            example[fieldName] = ['示例项目1', '示例项目2'];
+          }
+        } else if (Array.isArray(t)) {
+          // 简单处理联合类型（如 ['string','array']）
+          if (t.includes('string')) {
+            example[fieldName] = '示例内容';
+          } else if (t.includes('array')) {
             example[fieldName] = ['示例项目1', '示例项目2'];
           }
         }
