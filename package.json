@@ -1,6 +1,6 @@
 {
   "name": "waveforge",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "WaveForge MCP 任务管理系统 - 双层级任务管理解决方案，专为AI代理协同工作设计",
   "main": "dist/cjs/server.cjs",
   "module": "dist/esm/server.js",
