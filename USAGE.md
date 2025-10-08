@@ -2,45 +2,97 @@
 
 This document provides detailed instructions for setting up, configuring, and using the WaveForge MCP server.
 
-## 🚀 Quick Start
+## 🚀 Installation & Setup
 
-### Environment Requirements
+WaveForge is available as an npm package. The recommended way to use it is with `npx`, which ensures you are always using the latest version without a global installation.
+
+### MCP Client Configuration
+
+Add the following configuration to your MCP client (e.g., Cursor, Kiro):
+
+**JSON format (`.cursor/mcp.json`):**
+```json
+{
+  "mcpServers": {
+    "waveforge": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "waveforge@latest"],
+      "env": {
+        "WF_LOG_LEVEL": "SILENT",
+        "WF_DEBUG": "false",
+        "npm_config_loglevel": "silent",
+        "npm_config_yes": "true"
+      }
+    }
+  }
+}
+```
+
+**TOML format (`.codex/config.toml`):**
+```toml
+[mcp_servers.waveforge]
+command = "npx"
+args = ["-y", "waveforge@latest"]
+env = { "WF_LOG_LEVEL" = "SILENT", "WF_DEBUG" = "false", "npm_config_loglevel" = "silent", "npm_config_yes" = "true" }
+```
+
+After adding the configuration, reload your MCP client.
+
+### For Local Development
+
+If you plan to contribute to WaveForge, you'll need to set up a local development environment.
+
+#### Environment Requirements
 
 - Node.js >= 18.0.0
 - pnpm (recommended) or npm
 
-### Installation
+#### Setup
 
 ```bash
+# 1. Clone the repository
+git clone https://github.com/DeadWaveWave/waveforge.git
+cd waveforge
+
+# 2. Install dependencies
 pnpm install
-```
 
-### Development Mode
-
-```bash
-pnpm dev
-```
-
-### Build
-
-```bash
+# 3. Build the project
 pnpm build
 ```
 
-### Testing
+#### Running Locally
+
+You can run the server in development mode, which will watch for changes:
 
 ```bash
-pnpm test
+pnpm dev
 ```
 
-### Start Server
+To use your local build with an MCP client, update your configuration to point to the local server script:
 
-```bash
-# Development mode
-pnpm dev
+**JSON format (`.cursor/mcp.json`):**
+```json
+{
+  "mcpServers": {
+    "waveforge": {
+      "command": "node",
+      "args": ["/path/to/your/waveforge/dist/esm/server.js"],
+      "env": {
+        "WF_LOG_LEVEL": "SILENT"
+      }
+    }
+  }
+}
+```
 
-# Production mode
-pnpm start
+**TOML format (`.codex/config.toml`):**
+```toml
+[mcp_servers.waveforge]
+command = "node"
+args = ["/path/to/your/waveforge/dist/esm/server.js"]
+env = { "WF_LOG_LEVEL" = "SILENT" }
 ```
 
 ## 🔧 MCP Tools
@@ -709,11 +761,11 @@ The `project_info` tool provides comprehensive health monitoring for your projec
 
 | Issue Type           | Description                   | Auto-Fix | Manual Steps                  |
 | -------------------- | ----------------------------- | -------- | ----------------------------- |
-| `missing_directory`  | Required directories missing  | ✅ Yes   | Re-run connect_project        |
-| `corrupted_file`     | JSON files damaged            | ✅ Yes   | Restore from backup if needed |
-| `permission_denied`  | Insufficient file permissions | ❌ No    | Fix directory permissions     |
-| `template_missing`   | Template files not found      | ✅ Yes   | Will copy from defaults       |
-| `index_inconsistent` | Task index out of sync        | ✅ Yes   | Will rebuild automatically    |
+| `missing_directory`  | Required directories missing  | ✅ Yes    | Re-run connect_project        |
+| `corrupted_file`     | JSON files damaged            | ✅ Yes    | Restore from backup if needed |
+| `permission_denied`  | Insufficient file permissions | ❌ No     | Fix directory permissions     |
+| `template_missing`   | Template files not found      | ✅ Yes    | Will copy from defaults       |
+| `index_inconsistent` | Task index out of sync        | ✅ Yes    | Will rebuild automatically    |
 
 #### Preventive Health Measures
 
@@ -1008,6 +1060,7 @@ When possible, continue operation with reduced functionality:
 
 Add the following to your MCP client configuration:
 
+**JSON format (`.cursor/mcp.json`):**
 ```json
 {
   "mcpServers": {
@@ -1035,10 +1088,19 @@ Add the following to your MCP client configuration:
 }
 ```
 
+**TOML format (`.codex/config.toml`):**
+```toml
+[mcp_servers.waveforge]
+command = "node"
+args = ["path/to/waveforge/dist/esm/server.js"]
+env = { "WF_LOG_LEVEL" = "SILENT", "WF_DEBUG" = "false" }
+```
+
 #### Security-Enhanced Configuration
 
 For environments requiring higher security:
 
+**JSON format (`.cursor/mcp.json`):**
 ```json
 {
   "mcpServers": {
@@ -1059,10 +1121,19 @@ For environments requiring higher security:
 }
 ```
 
+**TOML format (`.codex/config.toml`):**
+```toml
+[mcp_servers.waveforge]
+command = "node"
+args = ["path/to/waveforge/dist/esm/server.js"]
+env = { "WF_LOG_LEVEL" = "SILENT", "WF_DEBUG" = "false", "WF_SECURITY_MODE" = "strict", "WF_ALLOWED_PATHS" = "/Users/username/Development,/Users/username/Projects" }
+```
+
 #### Development Configuration
 
 For development and debugging:
 
+**JSON format (`.cursor/mcp.json`):**
 ```json
 {
   "mcpServers": {
@@ -1080,6 +1151,14 @@ For development and debugging:
     }
   }
 }
+```
+
+**TOML format (`.codex/config.toml`):**
+```toml
+[mcp_servers.waveforge]
+command = "node"
+args = ["path/to/waveforge/dist/esm/server.js"]
+env = { "WF_LOG_LEVEL" = "DEBUG", "WF_DEBUG" = "true", "WF_AUDIT_LOG" = "true" }
 ```
 
 #### Configuration Options Explained

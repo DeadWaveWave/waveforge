@@ -2,11 +2,44 @@
 
 本指南将带你快速体验 WaveForge MCP 任务管理系统的完整工作流程。
 
-## 🚀 前置条件
+## 🚀 准备工作
 
-1. 已安装并构建 WaveForge MCP 服务器
-2. 已配置 MCP 客户端（如 Kiro IDE）
-3. 服务器正常运行
+### 1. 安装
+
+WaveForge 已经发布到 npm，你可以通过 `npx` 直接运行，无需本地安装。
+
+### 2. 配置 MCP 客户端
+
+在你的 MCP 客户端（如 Cursor 或 Kiro）中添加 WaveForge 服务器配置：
+
+**JSON format (`.cursor/mcp.json`):**
+```json
+{
+  "mcpServers": {
+    "waveforge": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "waveforge@latest"],
+      "env": {
+        "WF_LOG_LEVEL": "SILENT",
+        "WF_DEBUG": "false",
+        "npm_config_loglevel": "silent",
+        "npm_config_yes": "true"
+      }
+    }
+  }
+}
+```
+
+**TOML format (`.codex/config.toml`):**
+```toml
+[mcp_servers.waveforge]
+command = "npx"
+args = ["-y", "waveforge@latest"]
+env = { "WF_LOG_LEVEL" = "SILENT", "WF_DEBUG" = "false", "npm_config_loglevel" = "silent", "npm_config_yes" = "true" }
+```
+
+配置完成后，请重载你的 MCP 客户端以使配置生效。
 
 ## 📋 完整工作流程示例
 

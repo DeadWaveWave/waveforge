@@ -38,9 +38,86 @@ WaveForge MCP task management system is now largely complete! Core project manag
 
 ## 🚀 Getting Started
 
-For detailed instructions on installation, configuration, and usage, please see the [**Usage Guide (`USAGE.md`)**](./USAGE.md).
+WaveForge is now published to npm! The easiest way to get started is using `npx`.
 
-**Quick Start**: Want to jump right in? Check out the [**Quick Start Guide (`docs/quick-start.md`)**](./docs/quick-start.md) for a complete workflow example.
+### MCP Client Configuration
+
+Configure your MCP client (like Cursor or Kiro) to use WaveForge:
+
+**JSON format (`.cursor/mcp.json`):**
+```json
+{
+  "mcpServers": {
+    "waveforge": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "waveforge@latest"],
+      "env": {
+        "WF_LOG_LEVEL": "SILENT",
+        "WF_DEBUG": "false",
+        "npm_config_loglevel": "silent",
+        "npm_config_yes": "true"
+      }
+    }
+  }
+}
+```
+
+**TOML format (`.codex/config.toml`):**
+```toml
+[mcp_servers.waveforge]
+command = "npx"
+args = ["-y", "waveforge@latest"]
+env = { "WF_LOG_LEVEL" = "SILENT", "WF_DEBUG" = "false", "npm_config_loglevel" = "silent", "npm_config_yes" = "true" }
+```
+
+### Local Development
+
+If you want to contribute to WaveForge or run a local version:
+
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/DeadWaveWave/waveforge.git
+    cd waveforge
+    ```
+
+2.  **Install dependencies**:
+    ```bash
+    pnpm install
+    ```
+
+3.  **Run in development mode**:
+    ```bash
+    pnpm dev
+    ```
+
+4.  **Configure your MCP client to use the local build**:
+
+    **JSON format (`.cursor/mcp.json`):**
+    ```json
+    {
+      "mcpServers": {
+        "waveforge": {
+          "type": "stdio",
+          "command": "node",
+          "args": ["/path/to/your/waveforge/dist/esm/server.js"],
+          "env": {
+            "WF_LOG_LEVEL": "SILENT"
+          }
+        }
+      }
+    }
+    ```
+
+    **TOML format (`.codex/config.toml`):**
+    ```toml
+    [mcp_servers.waveforge]
+    command = "node"
+    args = ["/path/to/your/waveforge/dist/esm/server.js"]
+    env = { "WF_LOG_LEVEL" = "SILENT" }
+    ```
+
+For more detailed instructions, see the [**Usage Guide (`USAGE.md`)**](./USAGE.md) and [**Quick Start Guide (`docs/quick-start.md`)**](./docs/quick-start.md).
 
 If you encounter any issues, check the [**Troubleshooting Guide (`docs/troubleshooting.md`)**](./docs/troubleshooting.md) for known problems and solutions.
 

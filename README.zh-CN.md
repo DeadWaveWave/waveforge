@@ -39,9 +39,86 @@ WaveForge MCP 任务管理系统已基本完成！核心的项目管理和任务
 
 ## 🚀 快速上手
 
-关于安装、配置和使用的详细说明，请参阅 [**使用指南 (`USAGE.md`)**](./USAGE.md)。
+WaveForge 已经发布到 npm！最简单的上手方式是使用 `npx`。
 
-**快速开始**：想要立即体验？查看 [**快速开始指南 (`docs/quick-start.zh-CN.md`)**](./docs/quick-start.zh-CN.md) 了解完整的工作流程示例。
+### MCP 客户端配置
+
+配置你的 MCP 客户端（如 Cursor 或 Kiro）以使用 WaveForge：
+
+**JSON 格式 (`.cursor/mcp.json`):**
+```json
+{
+  "mcpServers": {
+    "waveforge": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "waveforge@latest"],
+      "env": {
+        "WF_LOG_LEVEL": "SILENT",
+        "WF_DEBUG": "false",
+        "npm_config_loglevel": "silent",
+        "npm_config_yes": "true"
+      }
+    }
+  }
+}
+```
+
+**TOML 格式 (`.codex/config.toml`):**
+```toml
+[mcp_servers.waveforge]
+command = "npx"
+args = ["-y", "waveforge@latest"]
+env = { "WF_LOG_LEVEL" = "SILENT", "WF_DEBUG" = "false", "npm_config_loglevel" = "silent", "npm_config_yes" = "true" }
+```
+
+### 本地开发
+
+如果你想为 WaveForge 贡献代码或运行本地版本：
+
+1.  **克隆仓库**：
+    ```bash
+    git clone https://github.com/DeadWaveWave/waveforge.git
+    cd waveforge
+    ```
+
+2.  **安装依赖**：
+    ```bash
+    pnpm install
+    ```
+
+3.  **运行开发模式**：
+    ```bash
+    pnpm dev
+    ```
+
+4.  **配置 MCP 客户端使用本地构建**：
+
+    **JSON 格式 (`.cursor/mcp.json`):**
+    ```json
+    {
+      "mcpServers": {
+        "waveforge": {
+          "type": "stdio",
+          "command": "node",
+          "args": ["/path/to/your/waveforge/dist/esm/server.js"],
+          "env": {
+            "WF_LOG_LEVEL": "SILENT"
+          }
+        }
+      }
+    }
+    ```
+
+    **TOML 格式 (`.codex/config.toml`):**
+    ```toml
+    [mcp_servers.waveforge]
+    command = "node"
+    args = ["/path/to/your/waveforge/dist/esm/server.js"]
+    env = { "WF_LOG_LEVEL" = "SILENT" }
+    ```
+
+关于更详细的说明，请参阅 [**使用指南 (`USAGE.md`)**](./USAGE.md) 和 [**快速开始指南 (`docs/quick-start.zh-CN.md`)**](./docs/quick-start.zh-CN.md)。
 
 如果遇到任何问题，请查看 [**故障排除指南 (`docs/troubleshooting.md`)**](./docs/troubleshooting.md) 获取已知问题的解决方案。
 
