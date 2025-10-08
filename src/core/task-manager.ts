@@ -574,6 +574,12 @@ export class TaskManager {
                 oldHints: change.oldValue,
                 newHints,
               });
+            } else if (change.field === 'context_tags') {
+              // 应用 context tags 变更
+              plan.contextTags = Array.isArray(change.newValue) ? change.newValue : [];
+            } else if (change.field === 'evr_bindings') {
+              // 应用 EVR 绑定变更
+              plan.evrBindings = Array.isArray(change.newValue) ? change.newValue : [];
             }
           }
         } else if (change.section.startsWith('plan:') && change.field === 'new_step') {
@@ -746,6 +752,14 @@ export class TaskManager {
         throw new Error('当前没有活跃的任务');
       }
 
+      // 参数转换：plan_no → plan_id（用于 EVR 绑定等）
+      if (params.plan_no && !params.plan_id) {
+        const planIndex = params.plan_no - 1;
+        if (planIndex >= 0 && planIndex < task.overall_plan.length) {
+          params.plan_id = task.overall_plan[planIndex].id;
+        }
+      }
+
       // 执行 Lazy 同步（在修改前应用面板变更）
       await this.performLazySync(task);
 
@@ -810,39 +824,32 @@ export class TaskManager {
         return null;
       }
 
-      let taskData: any;
-      try {
-        taskData = JSON.parse(data);
-      } catch (parseError) {
-        throw new Error('任务数据格式错误');
-      }
+      const task: CurrentTask = JSON.parse(data);
 
-      this.validateTaskDataStructure(taskData);
+      // 确保必要字段存在（破坏性更新）
+      if (task.overall_plan) {
+        for (const plan of task.overall_plan) {
+          if (!plan.evrBindings) plan.evrBindings = [];
+          if (!plan.contextTags) plan.contextTags = [];
+          if (plan.steps) {
+            for (const step of plan.steps) {
+              if (!step.contextTags) step.contextTags = [];
+            }
+          }
 
-      // 在同步前读取原始面板内容（用于后续预览避免回写干扰）
-      const panelPath = this.getCurrentTaskPanelPath();
-      let originalPanelContent: string | undefined;
-      if (panelPath && (await fs.pathExists(panelPath))) {
-        try {
-          originalPanelContent = await fs.readFile(panelPath, 'utf8');
-        } catch {
-          // 忽略读取面板失败
+          // 调试日志：读取任务时的 evrBindings
+          if (process.env.NODE_ENV !== 'production') {
+            logger.info(LogCategory.Task, LogAction.Handle, 'getCurrentTask: 读取到的 evrBindings', {
+              planId: plan.id,
+              evrBindings: plan.evrBindings,
+              length: plan.evrBindings?.length || 0,
+            });
+          }
         }
       }
 
-      // 注意：读取操作保持干净，不在此处执行懒同步（read 为 dry-run）
-      const syncResult: any = null;
-
-      // 重新加载任务以获取同步后的最新数据
-      const updatedData = await fs.readFile(taskPath, 'utf8');
-      const reloaded = JSON.parse(updatedData) as CurrentTask;
-
-      // 如果同步已应用，携带原始面板内容供后续预览使用（不持久化，只在内存中传递）
-      if (syncResult && syncResult.applied && originalPanelContent) {
-        (reloaded as any)._originalPanelContent = originalPanelContent;
-      }
-
-      return reloaded;
+      this.validateTaskDataStructure(task);
+      return task;
     } catch (error) {
       if (
         error instanceof Error &&
@@ -1451,11 +1458,24 @@ export class TaskManager {
       }
     }
 
-    // EVR 引导：当计划从 to_do 切换到 in_progress 时返回绑定的 EVR
-    let evrForNode: string[] | undefined;
-    if (params.status === TaskStatus.InProgress && plan.evrBindings?.length > 0) {
-      evrForNode = plan.evrBindings;
+    // EVR 引导：当计划切换到 in_progress 时返回绑定的 EVR
+    // 从 task 对象中查找最新的 plan（确保获取到保存后的状态）
+    const currentPlan = task.overall_plan.find(p => p.id === plan.id);
+    let evrForNode: string[] = [];
+
+    if (params.status === TaskStatus.InProgress && currentPlan) {
+      evrForNode = Array.isArray(currentPlan.evrBindings)
+        ? [...currentPlan.evrBindings]
+        : [];
     }
+
+    logger.info(LogCategory.Task, LogAction.Update, 'Plan 状态更新完成，EVR 引导', {
+      planId: plan.id,
+      newStatus: params.status,
+      hasCurrentPlan: !!currentPlan,
+      evrBindings: currentPlan?.evrBindings || null,
+      evrForNodeLength: evrForNode.length,
+    });
 
     return {
       success: true,
@@ -1463,7 +1483,8 @@ export class TaskManager {
       steps_required: stepsRequired,
       auto_advanced: autoAdvanced,
       started_new_plan: startedNewPlan,
-      evr_for_node: evrForNode,
+      // 设计要求：当计划状态变为 in_progress 时总是返回 evr_for_node（无绑定则返回空数组）
+      evr_for_node: params.status === TaskStatus.InProgress ? evrForNode : undefined,
     };
   }
 
@@ -1987,6 +2008,11 @@ export class TaskManager {
 
     task.goal = newGoal.trim();
 
+    // 如果传入了任务级 hints，一并覆盖/更新（与设计一致：modify 负责内容变更）
+    if (Array.isArray(params.hints)) {
+      task.task_hints = [...params.hints];
+    }
+
     const log: TaskLog = {
       timestamp,
       level: LogLevel.Info,
@@ -2000,6 +2026,7 @@ export class TaskManager {
         reason: params.reason,
         old_value: oldGoal,
         new_value: newGoal,
+        hints_updated: Array.isArray(params.hints) ? params.hints.length : 0,
       },
     };
     task.logs.push(log);
@@ -2386,13 +2413,18 @@ export class TaskManager {
     let operationCount = 0;
     let operationType = 'update';
 
-    // 处理 plan_no 参数（用于绑定 EVR 到计划）
+    // 处理 plan_no/plan_id 参数（用于绑定 EVR 到计划）
     let targetPlan: TaskPlan | undefined;
     if (params.plan_id) {
       targetPlan = task.overall_plan.find(p => p.id === params.plan_id);
       if (!targetPlan) {
         throw new Error(`计划 ${params.plan_id} 不存在`);
       }
+      logger.info(LogCategory.Task, LogAction.Modify, 'EVR 将绑定到计划', {
+        planId: targetPlan.id,
+        planDescription: targetPlan.description,
+        currentBindings: targetPlan.evrBindings?.length || 0,
+      });
     }
 
     // 处理 EVR 内容修改
@@ -2441,16 +2473,28 @@ export class TaskManager {
 
           // 如果指定了目标计划，将 EVR 绑定到该计划
           if (targetPlan) {
+            // 确保 evrBindings 数组存在
             if (!targetPlan.evrBindings) {
               targetPlan.evrBindings = [];
             }
-            targetPlan.evrBindings.push(newEVR.id);
+            // 避免重复绑定
+            if (!targetPlan.evrBindings.includes(newEVR.id)) {
+              targetPlan.evrBindings.push(newEVR.id);
+              logger.info(LogCategory.Task, LogAction.Modify, 'EVR 已绑定到计划', {
+                evrId: newEVR.id,
+                planId: targetPlan.id,
+                totalBindings: targetPlan.evrBindings.length,
+                allBindings: targetPlan.evrBindings,
+              });
+            }
 
             // 更新 EVR 的 referencedBy
             if (!newEVR.referencedBy) {
               newEVR.referencedBy = [];
             }
-            newEVR.referencedBy.push(targetPlan.id);
+            if (!newEVR.referencedBy.includes(targetPlan.id)) {
+              newEVR.referencedBy.push(targetPlan.id);
+            }
           }
         }
       }

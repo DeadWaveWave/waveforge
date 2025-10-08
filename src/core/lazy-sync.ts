@@ -767,10 +767,32 @@ export class LazySync {
         // 检测计划提示变更
         if (!this.arraysEqual(parsedPlan.hints, structuredPlan.hints || [])) {
           changes.push({
-            section: parsedPlan.id, // 使用 plan-1 而不是 plan:plan-1
+            section: parsedPlan.id,
             field: 'hints',
             oldValue: structuredPlan.hints || [],
             newValue: parsedPlan.hints,
+            source: 'panel',
+          });
+        }
+
+        // 检测 context tags 变更
+        if (!this.deepEqual(parsedPlan.contextTags, structuredPlan.contextTags || [])) {
+          changes.push({
+            section: parsedPlan.id,
+            field: 'context_tags',
+            oldValue: structuredPlan.contextTags || [],
+            newValue: parsedPlan.contextTags,
+            source: 'panel',
+          });
+        }
+
+        // 检测 EVR 绑定变更
+        if (!this.arraysEqual(parsedPlan.evrBindings, structuredPlan.evrBindings || [])) {
+          changes.push({
+            section: parsedPlan.id,
+            field: 'evr_bindings',
+            oldValue: structuredPlan.evrBindings || [],
+            newValue: parsedPlan.evrBindings,
             source: 'panel',
           });
         }
