@@ -32,7 +32,7 @@ export interface FileStats {
  * 内存文件统计信息实现
  */
 class MemoryFileStats implements FileStats {
-  constructor(private node: MemoryFileNode) {}
+  constructor(private node: MemoryFileNode) { }
 
   isFile(): boolean {
     return this.node.type === 'file';
@@ -365,12 +365,12 @@ export class InMemoryPanelFS {
 
 ## EVR 预期结果
 
-### EVR-001 基础功能验证 <!-- evr:evr-001 -->
+1. [x] EVR-001 基础功能验证 <!-- evr:evr-001 -->
 
-**verify:** 运行测试套件
-**expect:** 所有测试通过
-**status:** pass
-**class:** runtime
+   - [verify] 运行测试套件
+   - [expect] 所有测试通过
+   - [status] pass
+   - [class] runtime
 
 ## 关键日志
 

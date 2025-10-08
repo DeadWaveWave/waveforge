@@ -382,11 +382,9 @@ export class CurrentTaskReadTool extends BaseTaskTool {
         throw new NotFoundError('当前没有活跃任务');
       }
 
-      // 执行 Lazy 同步并应用变更（透明同步）
-      const syncResult = await this.taskManager.performLazySyncAndApply(
-        task,
-        params.project_id
-      );
+      // read 为只读预览（dry-run），不应用变更
+      // 只检测面板同步状态，不修改任务数据
+      const syncResult = await this.checkPanelSync(task);
 
       // 构建响应数据
       const responseData: any = {
@@ -409,22 +407,10 @@ export class CurrentTaskReadTool extends BaseTaskTool {
         responseData.evr_details = [];
       }
 
-      // 添加同步预览信息（如果有变更被应用）
-      if (syncResult && syncResult.changes.length > 0) {
-        responseData.panel_pending = false;
-        responseData.sync_preview = {
-          applied: true,
-          changes: syncResult.changes.map((change: any) => ({
-            type: 'content' as const,
-            section: change.section,
-            field: change.field,
-            oldValue: change.oldValue,
-            newValue: change.newValue,
-            source: change.source,
-          })),
-          conflicts: syncResult.conflicts || [],
-          affectedSections: [...new Set(syncResult.changes.map((c: any) => c.section))],
-        };
+      // 添加同步预览信息（read 为 dry-run，只预览）
+      if (syncResult && syncResult.hasPendingChanges && syncResult.preview) {
+        responseData.panel_pending = true;
+        responseData.sync_preview = syncResult.preview;
       } else {
         responseData.panel_pending = false;
       }
@@ -447,7 +433,7 @@ export class CurrentTaskReadTool extends BaseTaskTool {
         {
           taskId: task.id,
           evrReady: responseData.evr_ready,
-          syncApplied: syncResult ? syncResult.changes.length : 0,
+          panelPending: responseData.panel_pending,
           logsHighlights: responseData.logs_highlights.length,
           taskHintsCount: responseData.hints?.task?.length || 0,
         }

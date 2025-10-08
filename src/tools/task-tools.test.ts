@@ -404,17 +404,18 @@ describe('CurrentTaskUpdateTool', () => {
       expect(response.error).toContain('step_id');
     });
 
-    it('应该要求 notes 当状态为 completed 或 blocked 时', async () => {
+    it('应该要求 notes 当状态为 blocked 时（completed 的 notes 可选）', async () => {
       const result = await taskUpdateTool.handle({
         update_type: 'plan',
         plan_id: testTask.overall_plan[0].id,
-        status: 'completed',
+        status: 'blocked',
+        // 缺少 notes
       });
       const response = JSON.parse(result.content[0].text);
 
       expect(response.success).toBe(false);
       expect(response.error).toContain('notes');
-      expect(response.error).toContain('完成');
+      expect(response.error).toContain('阻塞');
     });
   });
 
@@ -612,8 +613,10 @@ describe('CurrentTaskUpdateTool', () => {
 
       expect(response.success).toBe(true);
       expect(response.hints).toBeDefined();
-      expect(response.hints.task).toContain('注意数据安全');
-      expect(response.hints.task).toContain('遵循编码规范');
+      // update 上下文不返回 task hints（级别隔离原则）
+      expect(response.hints.task).toHaveLength(0);
+      // 应该返回 plan hints
+      expect(response.hints.plan).toBeDefined();
     });
   });
 

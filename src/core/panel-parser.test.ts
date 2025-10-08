@@ -49,12 +49,12 @@ describe('PanelParser', () => {
 
 ## EVR 预期结果
 
-### EVR-001 基础功能验证 <!-- evr:evr-001 -->
+1. [x] EVR-001 基础功能验证 <!-- evr:evr-001 -->
 
-**verify:** 运行测试套件
-**expect:** 所有测试通过
-**status:** pass
-**class:** runtime
+   - [verify] 运行测试套件
+   - [expect] 所有测试通过
+   - [status] pass
+   - [class] runtime
 `;
 
       const result = parser.parseMarkdown(content);
@@ -118,19 +118,15 @@ describe('PanelParser', () => {
 
 ## EVR 预期结果
 
-### 多行验证 <!-- evr:evr-multi -->
+1. [ ] 多行验证 <!-- evr:evr-multi -->
 
-**verify:**
-- 运行单元测试
-- 运行集成测试
-- 检查代码覆盖率
-
-**expect:**
-- 所有测试通过
-- 覆盖率达到 80%
-- 没有 lint 错误
-
-**status:** unknown
+   - [verify] 运行单元测试
+   - [verify] 运行集成测试
+   - [verify] 检查代码覆盖率
+   - [expect] 所有测试通过
+   - [expect] 覆盖率达到 80%
+   - [expect] 没有 lint 错误
+   - [status] unknown
 `;
 
       const result = parser.parseMarkdown(content);
@@ -274,10 +270,11 @@ describe('PanelParser', () => {
 
 ## EVR 预期结果
 
-### 没有锚点的 EVR
+1. [ ] 没有锚点的 EVR
 
-**verify:** 测试
-**expect:** 通过
+   - [verify] 测试
+   - [expect] 通过
+   - [status] unknown
 `;
 
       const result = parser.parseWithTolerance(content);
@@ -302,8 +299,10 @@ describe('PanelParser', () => {
 1. [x] 第一个计划
 2. [x] 第二个计划
 ## EVR 预期结果
-### EVR-001
-**verify:** 测试`;
+1. [ ] EVR-001
+
+   - [verify] 测试
+   - [status] unknown`;
 
       const result = parser.parseWithTolerance(content);
 

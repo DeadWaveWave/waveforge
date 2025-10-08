@@ -323,15 +323,27 @@ export class PanelParser {
         const tagLower = tag.toLowerCase();
 
         if (tagLower === 'verify' || tagLower === '验证') {
-          this.finalizeEVRField(currentEVR, currentField, fieldContent);
-          currentField = 'verify';
-          fieldContent = [];
-          if (content) fieldContent.push(content);
+          // 如果已经在收集 verify 字段，继续累积
+          if (currentField === 'verify') {
+            if (content) fieldContent.push(content);
+          } else {
+            // 结束前一个字段，开始新的 verify 字段
+            this.finalizeEVRField(currentEVR, currentField, fieldContent);
+            currentField = 'verify';
+            fieldContent = [];
+            if (content) fieldContent.push(content);
+          }
         } else if (tagLower === 'expect' || tagLower === '预期') {
-          this.finalizeEVRField(currentEVR, currentField, fieldContent);
-          currentField = 'expect';
-          fieldContent = [];
-          if (content) fieldContent.push(content);
+          // 如果已经在收集 expect 字段，继续累积
+          if (currentField === 'expect') {
+            if (content) fieldContent.push(content);
+          } else {
+            // 结束前一个字段，开始新的 expect 字段
+            this.finalizeEVRField(currentEVR, currentField, fieldContent);
+            currentField = 'expect';
+            fieldContent = [];
+            if (content) fieldContent.push(content);
+          }
         } else if (tagLower === 'status' || tagLower === '状态') {
           this.finalizeEVRField(currentEVR, currentField, fieldContent);
           currentField = null;

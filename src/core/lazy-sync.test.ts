@@ -147,12 +147,12 @@ describe('LazySync', () => {
 
 ## EVR 预期结果
 
-### evr-001: 修改后的功能标题 <!-- evr:evr-001 -->
+1. [ ] evr-001: 修改后的功能标题 <!-- evr:evr-001 -->
 
-**verify:** 运行完整测试套件
-**expect:** 所有测试通过且覆盖率达到90%
-**status:** unknown
-**class:** runtime`;
+   - [verify] 运行完整测试套件
+   - [expect] 所有测试通过且覆盖率达到90%
+   - [status] unknown
+   - [class] runtime`;
 
       const diff = lazySync.detectDifferences(panelContent, sampleTask);
 
@@ -186,20 +186,16 @@ describe('LazySync', () => {
 
 ## EVR 预期结果
 
-### evr-002: 代码质量检查 <!-- evr:evr-002 -->
+1. [ ] evr-002: 代码质量检查 <!-- evr:evr-002 -->
 
-**verify:**
-- 运行 ESLint 检查
-- 运行 TypeScript 类型检查
-- 运行安全扫描
-
-**expect:**
-- 无 ESLint 错误
-- 无类型错误
-- 无安全漏洞
-
-**status:** unknown
-**class:** static`;
+   - [verify] 运行 ESLint 检查
+   - [verify] 运行 TypeScript 类型检查
+   - [verify] 运行安全扫描
+   - [expect] 无 ESLint 错误
+   - [expect] 无类型错误
+   - [expect] 无安全漏洞
+   - [status] unknown
+   - [class] static`;
 
       const diff = lazySync.detectDifferences(panelContent, sampleTask);
 
@@ -364,10 +360,11 @@ describe('LazySync', () => {
 
 ## 功能验证
 
-### evr-001: 测试EVR
+1. [ ] evr-001: 测试EVR
 
-- **verify**: 测试
-- **expect**: 通过`;
+   - [verify] 测试
+   - [expect] 通过
+   - [status] unknown`;
 
       const fingerprints = lazySync.computeSectionFingerprints(content);
 
@@ -657,24 +654,22 @@ describe('LazySync', () => {
 
 ## 功能验证
 
-### evr-001: 复杂验证1
+1. [ ] evr-001: 复杂验证1 <!-- evr:evr-001 -->
 
-- **verify**: 
-  - 验证项1
-  - 验证项2
-  - 验证项3
-- **expect**: 
-  - 期望结果1
-  - 期望结果2
-- **status**: unknown
-- **class**: runtime
+   - [verify] 验证项1
+   - [verify] 验证项2
+   - [verify] 验证项3
+   - [expect] 期望结果1
+   - [expect] 期望结果2
+   - [status] unknown
+   - [class] runtime
 
-### evr-002: 复杂验证2
+2. [x] evr-002: 复杂验证2 <!-- evr:evr-002 -->
 
-- **verify**: 单行验证
-- **expect**: 单行期望
-- **status**: pass
-- **class**: static`;
+   - [verify] 单行验证
+   - [expect] 单行期望
+   - [status] pass
+   - [class] static`;
 
       expect(() => {
         const diff = lazySync.detectDifferences(

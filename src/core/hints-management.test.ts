@@ -89,8 +89,9 @@ describe('提示功能综合测试', () => {
       updated_at: new Date().toISOString(),
     };
 
-    // Mock 动态返回更新后的任务数据
+    // Mock 动态返回更新后的任务数据（使用函数以获取最新的 testTask 值）
     (mockFs.readFile as any).mockImplementation(() => {
+      // 每次调用都返回当前的 testTask 状态
       return Promise.resolve(JSON.stringify(testTask));
     });
   });
@@ -322,7 +323,7 @@ describe('提示功能综合测试', () => {
       testTask.overall_plan[0].steps[0].hints = ['步骤级提示1', '步骤级提示2'];
     });
 
-    it('应该在计划级更新时返回任务级和计划级提示', async () => {
+    it('应该在计划级更新时返回计划级提示（不返回task hints - 级别隔离）', async () => {
       const planId = testTask.overall_plan[0].id;
 
       const result = await taskManager.updateTaskStatus({
@@ -334,14 +335,14 @@ describe('提示功能综合测试', () => {
 
       expect(result.success).toBe(true);
       expect(result.hints).toBeDefined();
-      expect(result.hints!.task).toContain('任务级提示1');
-      expect(result.hints!.task).toContain('任务级提示2');
+      // update 上下文不返回 task hints（级别隔离原则）
+      expect(result.hints!.task).toHaveLength(0);
       expect(result.hints!.plan).toContain('计划级提示1');
       expect(result.hints!.plan).toContain('计划级提示2');
       expect(result.hints!.step).toHaveLength(0);
     });
 
-    it('应该在步骤级更新时返回所有层级的提示', async () => {
+    it('应该在步骤级更新时返回步骤级提示（不返回task/plan hints - 级别隔离）', async () => {
       const stepId = testTask.overall_plan[0].steps[0].id;
 
       const result = await taskManager.updateTaskStatus({
@@ -353,10 +354,10 @@ describe('提示功能综合测试', () => {
 
       expect(result.success).toBe(true);
       expect(result.hints).toBeDefined();
-      expect(result.hints!.task).toContain('任务级提示1');
-      expect(result.hints!.task).toContain('任务级提示2');
-      expect(result.hints!.plan).toContain('计划级提示1');
-      expect(result.hints!.plan).toContain('计划级提示2');
+      // update 上下文不返回 task hints（级别隔离原则）
+      expect(result.hints!.task).toHaveLength(0);
+      // step 上下文不返回 plan hints（级别隔离原则）
+      expect(result.hints!.plan).toHaveLength(0);
       expect(result.hints!.step).toContain('步骤级提示1');
       expect(result.hints!.step).toContain('步骤级提示2');
     });
@@ -374,8 +375,8 @@ describe('提示功能综合测试', () => {
 
       expect(result.success).toBe(true);
       expect(result.hints).toBeDefined();
-      expect(result.hints!.task).toContain('任务级提示1');
-      expect(result.hints!.task).toContain('任务级提示2');
+      // update 上下文不返回 task hints
+      expect(result.hints!.task).toHaveLength(0);
       expect(result.hints!.plan).toHaveLength(0);
       expect(result.hints!.step).toHaveLength(0);
     });
@@ -554,8 +555,10 @@ describe('提示功能综合测试', () => {
         notes: '开始执行',
       });
 
-      expect(result.hints!.task).toContain('项目经理提示：注意进度');
-      expect(result.hints!.plan).toContain('架构师提示：考虑性能');
+      // update 上下文不返回 task hints（级别隔离）
+      expect(result.hints!.task).toHaveLength(0);
+      // step 上下文不返回 plan hints（级别隔离）
+      expect(result.hints!.plan).toHaveLength(0);
       expect(result.hints!.step).toContain('开发者提示：注意边界条件');
     });
   });

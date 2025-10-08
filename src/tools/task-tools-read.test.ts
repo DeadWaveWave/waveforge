@@ -18,6 +18,7 @@ describe('CurrentTaskReadTool - 升级版本', () => {
     taskManager = {
       getCurrentTask: vi.fn(),
       getCurrentTaskPanelPath: vi.fn(),
+      performLazySyncAndApply: vi.fn().mockResolvedValue(null), // 默认返回null表示无同步
     } as any;
 
     readTool = new CurrentTaskReadTool(taskManager);
